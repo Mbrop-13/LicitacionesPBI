@@ -1,0 +1,32 @@
+{
+  "name": "licitaciones-programbi",
+  "version": "2.0.0",
+  "description": "ProgramBI — Detección de licitaciones de Mercado Público (Chile) para cursos de Excel, Power BI, SQL Server, IA y más",
+  "main": "src/server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "buscar": "node src/scripts/buscar-ahora.js"
+  },
+  "keywords": [
+    "mercado-publico",
+    "licitaciones",
+    "chilecompra",
+    "programbi",
+    "power-bi",
+    "capacitacion"
+  ],
+  "author": "ProgramBI",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "node-cron": "^3.0.3",
+    "serverless-http": "^3.2.0"
+  }
+}

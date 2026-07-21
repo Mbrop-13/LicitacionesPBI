@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ProgramBI · Licitaciones</title>
+  <meta name="description" content="Detección de licitaciones de Mercado Público para ProgramBI">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=8">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230a0a0a'/%3E%3Ctext x='50' y='66' font-size='42' font-family='system-ui' font-weight='700' fill='white' text-anchor='middle'%3EBI%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+  <div class="layout" id="layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-brand">
+        <span class="brand-mark">BI</span>
+        <div class="brand-text">
+          <strong>ProgramBI</strong>
+          <span>Licitaciones</span>
+        </div>
+        <button type="button" class="btn-icon sidebar-hide-desktop" id="btn-sidebar-collapse" title="Minimizar / expandir panel" aria-label="Minimizar panel">
+          <svg class="icon-collapse" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M15 18l-6-6 6-6"/></svg>
+          <svg class="icon-expand" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M9 18l6-6-6-6"/></svg>
+        </button>
+        <button type="button" class="sidebar-close" id="btn-sidebar-close" aria-label="Cerrar menú">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-label">Bandeja</div>
+        <nav class="side-nav">
+          <button type="button" class="side-item active" data-view="pendientes" title="Sin revisar">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            <span>Sin revisar</span>
+            <em class="count" id="nav-pendientes">0</em>
+          </button>
+          <button type="button" class="side-item" data-view="todas" title="Encontradas">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+            <span>Encontradas</span>
+            <em class="count" id="nav-todas">0</em>
+          </button>
+          <button type="button" class="side-item" data-view="procesadas" title="Procesadas">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M20 6 9 17l-5-5"/></svg>
+            <span>Procesadas</span>
+            <em class="count" id="nav-procesadas">0</em>
+          </button>
+          <button type="button" class="side-item" data-view="favoritas" title="Favoritas">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            <span>Favoritas</span>
+            <em class="count" id="nav-favoritas">0</em>
+          </button>
+        </nav>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-label">Auditoría</div>
+        <nav class="side-nav">
+          <button type="button" class="side-item" data-view="descartadas" title="Descartadas">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg>
+            <span>Descartadas</span>
+            <em class="count" id="nav-descartadas">0</em>
+          </button>
+          <button type="button" class="side-item" data-view="historial" title="Historial">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/></svg>
+            <span>Historial</span>
+          </button>
+        </nav>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-label">Sistema</div>
+        <nav class="side-nav">
+          <button type="button" class="side-item" id="btn-open-config" title="Configuración">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+            <span>Configuración</span>
+          </button>
+        </nav>
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="conn-card" id="conn-card">
+          <div class="conn-row">
+            <span class="conn-dot" id="conn-dot"></span>
+            <span id="conn-label">API Mercado Público</span>
+          </div>
+          <div class="conn-meta" id="conn-meta">Comprobando…</div>
+          <button type="button" class="btn btn-ghost btn-sm conn-ping" id="btn-ping">Probar conexión</button>
+        </div>
+      </div>
+    </aside>
+
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+    <div class="main-wrap">
+      <header class="topbar" id="topbar">
+        <div class="topbar-left">
+          <button type="button" class="btn-icon" id="btn-menu" title="Mostrar panel" aria-label="Menú">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+          </button>
+          <div>
+            <h1 class="top-title" id="view-title">Sin revisar</h1>
+            <p class="top-sub" id="view-sub">Oportunidades detectadas pendientes de lectura</p>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <div class="notif-wrap">
+            <button type="button" class="btn-icon" id="btn-notif" title="Notificaciones" aria-label="Notificaciones">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+              <span class="badge" id="notif-badge" hidden>0</span>
+            </button>
+            <div class="notif-panel" id="notif-panel">
+              <div class="notif-panel-head">
+                <span>Notificaciones</span>
+                <button type="button" class="btn btn-ghost btn-sm" id="btn-notif-leer">Marcar leídas</button>
+              </div>
+              <div class="notif-list" id="notif-list">
+                <div class="notif-empty">Sin notificaciones aún</div>
+              </div>
+            </div>
+          </div>
+          <button type="button" class="btn btn-secondary" id="btn-csv" title="Exportar la página actual">Exportar</button>
+          <button type="button" class="btn btn-secondary" id="btn-import-csv" title="Subir CSV exportado de Mercado Público">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Subir CSV
+          </button>
+          <input type="file" id="input-csv" accept=".csv,text/csv,text/plain,.txt" hidden>
+          <div class="search-btns" id="search-btns">
+            <button type="button" class="btn btn-primary btn-search" id="btn-buscar" aria-busy="false">
+              <span class="btn-idle" id="btn-buscar-idle">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                Buscar ahora
+              </span>
+              <span class="btn-loading" id="btn-buscar-loading" aria-hidden="true">
+                <span class="eq" aria-hidden="true">
+                  <i></i><i></i><i></i><i></i><i></i>
+                </span>
+                <span class="btn-loading-txt" id="btn-buscar-txt">Buscando…</span>
+              </span>
+            </button>
+            <button type="button" class="btn btn-stop" id="btn-detener" hidden title="Detener búsqueda">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>
+              Detener
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main class="content" id="content">
+        <div class="alerts" id="alerta-host"></div>
+
+        <div class="kpi-strip" id="kpi-strip">
+          <div class="kpi-mini"><span class="kpi-mini-val" id="kpi-total">—</span><span class="kpi-mini-lbl">Encontradas</span></div>
+          <div class="kpi-mini"><span class="kpi-mini-val" id="kpi-nuevas">—</span><span class="kpi-mini-lbl">Sin revisar</span></div>
+          <div class="kpi-mini"><span class="kpi-mini-val" id="kpi-proc">—</span><span class="kpi-mini-lbl">Procesadas</span></div>
+          <div class="kpi-mini"><span class="kpi-mini-val" id="kpi-fav">—</span><span class="kpi-mini-lbl">Favoritas</span></div>
+          <div class="kpi-mini"><span class="kpi-mini-val" id="kpi-desc">—</span><span class="kpi-mini-lbl">Descartadas</span></div>
+          <div class="kpi-mini wide"><span class="kpi-mini-val sm" id="kpi-ult">—</span><span class="kpi-mini-lbl">Último escaneo</span></div>
+        </div>
+
+        <div class="filters" id="filters-oportunidades">
+          <div class="search-wrap">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            <input type="search" id="f-q" placeholder="Buscar por nombre, organismo o código…" autocomplete="off">
+          </div>
+          <select class="select" id="f-curso"><option value="">Todos los cursos</option></select>
+          <select class="select" id="f-estado"><option value="">Todos los estados</option></select>
+          <select class="select" id="f-orden">
+            <option value="">Mayor afinidad</option>
+            <option value="reciente">Más recientes</option>
+            <option value="cierre">Cierre próximo</option>
+          </select>
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-mark-all">Marcar procesadas</button>
+        </div>
+
+        <div class="filters" id="filters-descartadas" hidden>
+          <div class="search-wrap">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            <input type="search" id="f-q-desc" placeholder="Buscar en descartadas…" autocomplete="off">
+          </div>
+          <select class="select" id="f-motivo">
+            <option value="">Todos los motivos</option>
+            <option value="sin_coincidencia">Sin coincidencia</option>
+            <option value="solo_formacion">Solo formación genérica</option>
+            <option value="bajo_umbral">Bajo umbral</option>
+            <option value="no_aplica">No aplica</option>
+          </select>
+          <p class="filter-hint">Vienen de la API o de un <b>CSV</b> de Mercado Público y no pasaron el filtro ProgramBI. Si alguna sí aplica, usa <b>Salvar</b>.</p>
+        </div>
+
+        <div class="results-meta">
+          <span id="results-count">Cargando…</span>
+        </div>
+
+        <div class="lic-list" id="lista"></div>
+        <div id="historial-host" hidden></div>
+
+        <div class="pagination" id="pagination" hidden>
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-page-prev">Anterior</button>
+          <span class="page-info" id="page-info">1 / 1</span>
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-page-next">Siguiente</button>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Detail drawer -->
+  <div class="overlay" id="overlay"></div>
+  <aside class="drawer" id="drawer" aria-hidden="true">
+    <div class="drawer-head">
+      <h2>Detalle</h2>
+      <button type="button" class="btn-icon" id="btn-close-drawer" aria-label="Cerrar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="drawer-body" id="drawer-body"></div>
+    <div class="drawer-foot" id="drawer-foot">
+      <a class="btn btn-primary" id="drawer-link" href="#" target="_blank" rel="noopener" style="flex:1">Ver en Mercado Público</a>
+      <button type="button" class="btn btn-secondary" id="drawer-fav">Favorito</button>
+    </div>
+  </aside>
+
+  <!-- Config modal -->
+  <div class="modal-overlay" id="config-overlay" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="config-title">
+      <div class="modal-head">
+        <div>
+          <h2 id="config-title">Configuración</h2>
+          <p class="modal-sub">Mercado Público · palabras clave · notificaciones</p>
+        </div>
+        <button type="button" class="btn-icon" id="btn-close-config" aria-label="Cerrar">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <section class="modal-block">
+          <h3>Estado del sistema</h3>
+          <div class="status-row" style="margin-top:0.65rem">
+            <div class="status-item">API <span class="pill" id="cfg-st-ticket"><span class="dot"></span>…</span></div>
+            <div class="status-item">Storage <span class="pill" id="cfg-st-storage"><span class="dot"></span>…</span></div>
+            <div class="status-item">Webhook <span class="pill" id="cfg-st-webhook"><span class="dot"></span>…</span></div>
+          </div>
+          <div class="actions-row">
+            <button type="button" class="btn btn-secondary btn-sm" id="cfg-btn-ping">Probar API</button>
+            <span class="save-msg" id="cfg-ping-msg" style="margin:0"></span>
+          </div>
+        </section>
+
+        <section class="modal-block">
+          <h3>Palabras clave</h3>
+          <p class="hint">Se guarda si hay al menos 1 keyword técnica. “Capacitación” sola no basta.</p>
+          <div id="cursos-editor"></div>
+          <div class="field-inline">
+            <label for="cfg-umbral">Umbral mínimo</label>
+            <input type="number" id="cfg-umbral" min="1" max="20" value="1">
+          </div>
+          <div class="actions-row">
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-add-curso">Añadir curso</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-reset-config">Restaurar</button>
+            <button type="button" class="btn btn-primary btn-sm" id="btn-save-config">Guardar</button>
+          </div>
+          <p class="save-msg" id="save-msg"></p>
+        </section>
+
+        <section class="modal-block">
+          <h3>Notificaciones</h3>
+          <p class="hint" style="margin-bottom:0">
+            Opcional en <code>.env</code>: <code>NOTIFY_WEBHOOK_URL</code> · <code>NOTIFY_EMAIL</code>
+          </p>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-host" id="toast-host"></div>
+  <script src="app.js?v=8"></script>
+</body>
+</html>
