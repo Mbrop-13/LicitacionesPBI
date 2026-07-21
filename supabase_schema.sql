@@ -52,6 +52,31 @@ create table if not exists public.config_keywords (
   constraint config_keywords_singleton check (id = 1)
 );
 
+-- Descartadas (licitaciones que la API trajo pero no pasaron el filtro)
+create table if not exists public.descartadas (
+  codigo_externo    text primary key,
+  nombre            text,
+  nombre_organismo  text,
+  estado            text,
+  fecha_publicacion timestamptz,
+  fecha_cierre      timestamptz,
+  url_ficha         text,
+  score             integer default 0,
+  score_tecnico     integer default 0,
+  afinidad          integer default 0,
+  motivo            text default 'sin_coincidencia',
+  cursos_parciales  jsonb default '[]'::jsonb,
+  coincidencias     jsonb default '[]'::jsonb,
+  busqueda_id       text,
+  veces_visto       integer default 1,
+  primera_vez       timestamptz default now(),
+  ultima_vez        timestamptz default now()
+);
+
+create index if not exists idx_desc_ultima_vez on public.descartadas (ultima_vez);
+create index if not exists idx_desc_motivo     on public.descartadas (motivo);
+create index if not exists idx_desc_nombre     on public.descartadas (nombre);
+
 -- Actualiza actualizado_en automaticamente (UPSERT)
 create or replace function public.touch_actualizado()
 returns trigger language plpgsql as $$
@@ -73,6 +98,7 @@ for each row execute function public.touch_actualizado();
 alter table public.licitaciones   enable row level security;
 alter table public.log_busquedas  enable row level security;
 alter table public.config_keywords enable row level security;
+alter table public.descartadas    enable row level security;
 
 -- Para produccion con service_role no necesitas policies aqui.
 -- Si quieres acceso desde el navegador (anon key), define policies, ej:

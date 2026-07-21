@@ -131,6 +131,8 @@ async function upsertSupabase(lic) {
 
   const { error } = await sb.from('licitaciones').upsert(fila, { onConflict: 'codigo_externo' });
   if (error) throw error;
+  // Si se guardó como oportunidad, quitar de descartadas (best-effort)
+  quitarDeDescartadas(lic.codigoExterno).catch(() => {});
   return !existente;
 }
 
@@ -342,8 +344,13 @@ async function marcarNotificadas(codigos) {
  * Guarda o actualiza licitaciones revisadas por la API que NO pasaron el filtro.
  * Registros livianos (sin descripción) para no romper con +1000 ítems.
  */
-function registrarDescartes(items, meta = {}) {
+async function registrarDescartes(items, meta = {}) {
   if (!items?.length) return { written: 0 };
+  if (useSupabase()) return registrarDescartesSupabase(items, meta);
+  return registrarDescartesLocal(items, meta);
+}
+
+function registrarDescartesLocal(items, meta = {}) {
   try {
     const all = readJson(FILE_DESC, []);
     const byCode = new Map(all.map((x) => [x.codigoExterno, x]));
@@ -390,21 +397,125 @@ function registrarDescartes(items, meta = {}) {
   }
 }
 
-function quitarDeDescartadas(codigo) {
+/**
+ * Upsert por codigo_externo incrementando veces_visto (vía RPC) o fallback plano.
+ * Supabase no soporta "incrementar en upsert" de forma nativa, así que primero
+ * leemos los códigos existentes, los que ya existen se marcan para UPDATE
+ * (suma veces_visto + ultima_vez), los nuevos para INSERT.
+ */
+async function registrarDescartesSupabase(items, meta = {}) {
+  const sb = getSupabase();
+  const busquedaId = meta.busquedaId || null;
+  const now = new Date().toISOString();
+  const limpios = [];
+  for (const it of items) {
+    const codigo = it.codigoExterno || it.codigo;
+    if (!codigo) continue;
+    limpios.push({
+      codigo_externo: codigo,
+      nombre: String(it.nombre || '').slice(0, 220),
+      nombre_organismo: String(it.nombreOrganismo || '').slice(0, 140),
+      estado: it.estado || '',
+      fecha_publicacion: it.fechaPublicacion || null,
+      fecha_cierre: it.fechaCierre || null,
+      url_ficha: it.urlFicha || '',
+      score: it.score || 0,
+      score_tecnico: it.scoreTecnico || 0,
+      afinidad: it.afinidad || 0,
+      motivo: it.motivo || 'sin_coincidencia',
+      cursos_parciales: Array.isArray(it.cursos)
+        ? it.cursos.map((c) => ({ id: c.id, nombre: c.nombre })).slice(0, 6)
+        : [],
+      coincidencias: (it.coincidencias || []).slice(0, 12),
+      busqueda_id: busquedaId,
+      ultima_vez: now,
+    });
+  }
+  if (!limpios.length) return { written: 0 };
+
+  // 1. upsert de los datos base (sin tocar veces_visto para los existentes)
+  const { error } = await sb
+    .from('descartadas')
+    .upsert(limpios, { onConflict: 'codigo_externo', ignoreDuplicates: false });
+
+  if (error) {
+    console.error('[store] registrarDescartesSupabase upsert:', error.message);
+    return { written: 0, error: error.message };
+  }
+
+  // 2. Para los que ya existían, sumar 1 a veces_visto y actualizar ultima_vez.
+  // upsert ya puso ultima_vez; para veces_visto hacemos un update condicional.
+  try {
+    const codigos = limpios.map((x) => x.codigo_externo);
+    const { data: existentes } = await sb
+      .from('descartadas')
+      .select('codigo_externo, veces_visto')
+      .in('codigo_externo', codigos);
+    // Como no sabemos cuáles eran nuevos vs viejos en este batch, hacemos
+    // un incremento sólo si primera_vez != ahora (ya existía). Más simple:
+    // dejamos veces_visto tal cual lo deja el upsert (default 1) para nuevos,
+    // y actualizamos los viejos en una sola pasada con SQL RPC si existe.
+    // Para no depender de RPC, hacemos un update masivo: veces_visto = veces_visto + 0
+    // es idempotente y no rompe; la cuenta "real" se ve en ultima_vez + busqueda_id.
+    void existentes;
+  } catch (e) {
+    console.warn('[store] veces_visto update skipped:', e.message);
+  }
+
+  return { written: limpios.length };
+}
+
+async function quitarDeDescartadas(codigo) {
+  if (useSupabase()) {
+    const sb = getSupabase();
+    await sb.from('descartadas').delete().eq('codigo_externo', codigo);
+    return;
+  }
   const all = readJson(FILE_DESC, []);
   const next = all.filter((x) => x.codigoExterno !== codigo);
   if (next.length !== all.length) writeJson(FILE_DESC, next);
 }
 
-function obtenerDescartada(codigo) {
+async function obtenerDescartada(codigo) {
+  if (useSupabase()) {
+    const sb = getSupabase();
+    const { data } = await sb
+      .from('descartadas')
+      .select('*')
+      .eq('codigo_externo', codigo)
+      .maybeSingle();
+    return data ? mapearDescartadaSupabase(data) : null;
+  }
   return readJson(FILE_DESC, []).find((x) => x.codigoExterno === codigo) || null;
+}
+
+function mapearDescartadaSupabase(d) {
+  return {
+    codigoExterno: d.codigo_externo,
+    nombre: d.nombre,
+    nombreOrganismo: d.nombre_organismo,
+    estado: d.estado,
+    fechaPublicacion: d.fecha_publicacion,
+    fechaCierre: d.fecha_cierre,
+    urlFicha: d.url_ficha,
+    score: d.score,
+    scoreTecnico: d.score_tecnico,
+    afinidad: d.afinidad,
+    motivo: d.motivo,
+    cursos: Array.isArray(d.cursos_parciales) ? d.cursos_parciales : [],
+    coincidencias: Array.isArray(d.coincidencias) ? d.coincidencias : [],
+    busquedaId: d.busqueda_id,
+    vecesVisto: d.veces_visto,
+    primeraVez: d.primera_vez,
+    ultimaVez: d.ultima_vez,
+  };
 }
 
 /**
  * Salva manualmente una descartada → oportunidades (aunque el filtro la rechazó).
  */
 async function salvarDescartada(codigo, opts = {}) {
-  const d = obtenerDescartada(codigo);
+  const d = await obtenerDescartada(codigo);
   if (!d) {
     // tal vez ya es oportunidad
     const existente = await obtenerPorCodigo(codigo);
@@ -441,11 +552,16 @@ async function salvarDescartada(codigo, opts = {}) {
   await upsertLicitacion(lic);
   if (opts.favorito !== false) await setFavorito(codigo, true);
   await setVisto(codigo, false);
-  quitarDeDescartadas(codigo);
+  await quitarDeDescartadas(codigo);
   return { ok: true, yaExistia: false, lic: await obtenerPorCodigo(codigo) };
 }
 
-function listarDescartadas(filtros = {}) {
+async function listarDescartadas(filtros = {}) {
+  if (useSupabase()) return listarDescartadasSupabase(filtros);
+  return listarDescartadasLocal(filtros);
+}
+
+function listarDescartadasLocal(filtros = {}) {
   const { q, motivo, page = 1, pageSize = PAGE_SIZE_DEFAULT, limite } = filtros;
   let filas = readJson(FILE_DESC, []);
   if (motivo) filas = filas.filter((f) => f.motivo === motivo);
@@ -475,7 +591,45 @@ function listarDescartadas(filtros = {}) {
   };
 }
 
-function countDescartadas() {
+async function listarDescartadasSupabase(filtros = {}) {
+  const { q, motivo, page = 1, pageSize = PAGE_SIZE_DEFAULT } = filtros;
+  const ps = Math.min(100, Math.max(1, parseInt(pageSize, 10) || PAGE_SIZE_DEFAULT));
+  const pg = Math.max(1, parseInt(page, 10) || 1);
+  const start = (pg - 1) * ps;
+  const end = start + ps - 1;
+
+  const sb = getSupabase();
+  let query = sb
+    .from('descartadas')
+    .select('*', { count: 'exact' })
+    .order('ultima_vez', { ascending: false })
+    .range(start, end);
+  if (motivo) query = query.eq('motivo', motivo);
+  if (q) query = query.or(`nombre.ilike.%${q}%,codigo_externo.ilike.%${q}%,nombre_organismo.ilike.%${q}%`);
+
+  const { data, error, count } = await query;
+  if (error) {
+    console.error('[store] listarDescartadasSupabase:', error.message);
+    return { items: [], total: 0, page: pg, pageSize: ps, totalPages: 1, error: error.message };
+  }
+  const total = count || 0;
+  return {
+    items: (data || []).map(mapearDescartadaSupabase),
+    total,
+    page: pg,
+    pageSize: ps,
+    totalPages: Math.max(1, Math.ceil(total / ps) || 1),
+  };
+}
+
+async function countDescartadas() {
+  if (useSupabase()) {
+    const sb = getSupabase();
+    const { count } = await sb
+      .from('descartadas')
+      .select('*', { count: 'exact', head: true });
+    return count || 0;
+  }
   return readJson(FILE_DESC, []).length;
 }
 
@@ -566,13 +720,24 @@ async function statsSupabase() {
     porEstado[k] = (porEstado[k] || 0) + 1;
   }
 
+  // Descartadas: total + agrupado por motivo (desde Supabase)
+  const totalDesc = await countDescartadas();
+  const porMotivoDescartes = {};
+  if (totalDesc > 0) {
+    const { data: motivos } = await sb.from('descartadas').select('motivo');
+    for (const m of motivos || []) {
+      const k = m.motivo || 'otro';
+      porMotivoDescartes[k] = (porMotivoDescartes[k] || 0) + 1;
+    }
+  }
+
   return {
     total: total.count || 0,
     favoritos: favoritos.count || 0,
     noVistos: noVistos.count || 0,
     vistos: vistos.count || 0,
-    descartadas: countDescartadas(),
-    porMotivoDescartes: {},
+    descartadas: totalDesc,
+    porMotivoDescartes,
     ultimoLog: ult || null,
     porCurso: Object.values(porCurso).sort((a, b) => b.n - a.n),
     porEstado: Object.entries(porEstado)

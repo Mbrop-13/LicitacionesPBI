@@ -156,7 +156,7 @@ async function ejecutarBusqueda(opts = {}) {
         dDia++;
         batchDescartes.push(slimDescarte(lic, res));
         if (batchDescartes.length >= FLUSH_CADA) {
-          store.registrarDescartes(batchDescartes.splice(0, batchDescartes.length), {
+          await store.registrarDescartes(batchDescartes.splice(0, batchDescartes.length), {
             busquedaId,
           });
         }
@@ -178,7 +178,7 @@ async function ejecutarBusqueda(opts = {}) {
 
     // flush al terminar cada día
     if (batchDescartes.length) {
-      store.registrarDescartes(batchDescartes.splice(0, batchDescartes.length), { busquedaId });
+      await store.registrarDescartes(batchDescartes.splice(0, batchDescartes.length), { busquedaId });
     }
 
     porFecha.push({
@@ -193,7 +193,7 @@ async function ejecutarBusqueda(opts = {}) {
   }
 
   if (batchDescartes.length) {
-    store.registrarDescartes(batchDescartes, { busquedaId });
+    await store.registrarDescartes(batchDescartes, { busquedaId });
   }
 
   const detalleParts = [];
@@ -280,7 +280,7 @@ async function reevaluarCodigo(codigo) {
   const res = evaluar(lic, perfil);
 
   if (!res.pasa) {
-    store.registrarDescartes([slimDescarte(lic, res)], { busquedaId: 'reeval' });
+    store.registrarDescartes([slimDescarte(lic, res)], { busquedaId: 'reeval' }).catch(() => {});
     return {
       ok: true,
       guardada: false,

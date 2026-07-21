@@ -110,16 +110,15 @@ app.post(`${BASE}/licitaciones/marcar-vistas`, async (req, res) => {
 });
 
 // ── Descartadas ──
-app.get(`${BASE}/descartadas`, (req, res) => {
+app.get(`${BASE}/descartadas`, async (req, res) => {
   try {
-    res.json(
-      store.listarDescartadas({
-        q: req.query.q,
-        motivo: req.query.motivo,
-        page: parseInt(req.query.page || '1', 10),
-        pageSize: parseInt(req.query.pageSize || '50', 10),
-      })
-    );
+    const data = await store.listarDescartadas({
+      q: req.query.q,
+      motivo: req.query.motivo,
+      page: parseInt(req.query.page || '1', 10),
+      pageSize: parseInt(req.query.pageSize || '50', 10),
+    });
+    res.json(data);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
