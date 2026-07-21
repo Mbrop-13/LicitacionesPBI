@@ -35,9 +35,10 @@ function getJob() {
 }
 
 /**
- * Lanza búsqueda sin bloquear. Si ya hay una, error.
+ * Lanza búsqueda. En Vercel (serverless) espera a que termine (sync)
+ * para evitar congelamiento de la función serverless.
  */
-function startJob(opts = {}) {
+async function startJob(opts = {}) {
   if (control.isActive() || (job && job.status === 'running')) {
     const err = new Error(
       `Ya hay una búsqueda en curso (~${getJob().segundos}s). Pulsa Detener primero.`
@@ -56,35 +57,39 @@ function startJob(opts = {}) {
     origen: opts.origen || 'manual',
   };
 
-  // Fire-and-forget
-  setImmediate(() => {
-    ejecutarBusqueda({
-      origen: opts.origen || 'manual',
-      diasExtra: opts.diasExtra,
-    })
-      .then((r) => {
-        if (job && job.id === id) {
-          job.status = r.cancelada ? 'cancelled' : 'done';
-          job.result = r;
-        }
-      })
-      .catch((e) => {
-        if (job && job.id === id) {
-          job.status = 'error';
-          job.error = e.message || String(e);
-        }
-      })
-      .finally(() => {
-        // Asegura liberar control por si acaso
-        if (job && job.id === id && control.isActive()) {
-          try {
-            control.forceRelease();
-          } catch {
-            /* ignore */
-          }
-        }
+  const runPromise = (async () => {
+    try {
+      const r = await ejecutarBusqueda({
+        origen: opts.origen || 'manual',
+        diasExtra: opts.diasExtra,
       });
-  });
+      if (job && job.id === id) {
+        job.status = r.cancelada ? 'cancelled' : 'done';
+        job.result = r;
+      }
+      return r;
+    } catch (e) {
+      if (job && job.id === id) {
+        job.status = 'error';
+        job.error = e.message || String(e);
+      }
+      throw e;
+    } finally {
+      if (job && job.id === id && control.isActive()) {
+        try {
+          control.forceRelease();
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  })();
+
+  const isSync = opts.sync || !!process.env.VERCEL;
+  if (isSync) {
+    await runPromise.catch(() => {});
+    return { id, status: job.status, result: job.result, error: job.error };
+  }
 
   return { id, status: 'running' };
 }

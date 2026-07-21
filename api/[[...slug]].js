@@ -222,14 +222,14 @@ app.post(`${BASE}/importar-csv`, async (req, res) => {
   }
 });
 
-// ── Buscar (job en background: responde al instante) ──
-app.post(`${BASE}/buscar`, (req, res) => {
+// ── Buscar (en Vercel espera la ejecución para no congelarse) ──
+app.post(`${BASE}/buscar`, async (req, res) => {
   try {
     // Por si quedó un lock fantasma sin job real
     if (control.isActive() && !job.getJob().enCurso) {
       control.forceRelease();
     }
-    const started = job.startJob({
+    const started = await job.startJob({
       origen: 'manual',
       diasExtra: req.body?.diasExtra,
     });
@@ -263,7 +263,7 @@ app.get(`${BASE}/buscar/estado`, (_req, res) => {
   });
 });
 
-app.get(`${BASE}/cron`, (req, res) => {
+app.get(`${BASE}/cron`, async (req, res) => {
   const auth = req.headers.authorization || '';
   if (config.cronSecret && auth !== `Bearer ${config.cronSecret}`) {
     if (req.query.secret !== config.cronSecret) {
@@ -271,7 +271,7 @@ app.get(`${BASE}/cron`, (req, res) => {
     }
   }
   try {
-    const started = job.startJob({ origen: 'cron' });
+    const started = await job.startJob({ origen: 'cron' });
     res.json({ ok: true, started: true, ...started });
   } catch (e) {
     res.status(409).json({ error: e.message });

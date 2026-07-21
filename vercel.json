@@ -1,6 +1,7 @@
 {
   "version": 2,
   "cleanUrls": true,
+  "maxDuration": 60,
   "rewrites": [
     { "source": "/dashboard", "destination": "/index.html" },
     { "source": "/configuracion", "destination": "/config.html" }
