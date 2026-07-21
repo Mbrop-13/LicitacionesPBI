@@ -1,9 +1,9 @@
 'use strict';
 
-// Servidor de desarrollo local. En Vercel se usa api/[[...slug]].js
+// Servidor de desarrollo local. En Vercel se usa api/[...slug].js
 const path = require('path');
 const express = require('express');
-const apiApp = require('../api/index.js');
+const apiApp = require('./apiApp');
 const scheduler = require('./scheduler');
 const { config } = require('./config');
 const store = require('./store/db');

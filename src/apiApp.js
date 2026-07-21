@@ -1,15 +1,16 @@
 'use strict';
 
+// App Express compartida entre el servidor local (src/server.js)
+// y la función serverless de Vercel (api/[...slug].js).
 const express = require('express');
-const serverless = require('serverless-http');
-const { config, ticketOk, supabaseOk } = require('../src/config');
-const { KEYWORDS_DEFAULT } = require('../src/matcher/keywords');
-const store = require('../src/store/db');
-const { reevaluarCodigo } = require('../src/buscador');
-const { pingApi } = require('../src/services/mercadoPublico');
-const control = require('../src/busquedaControl');
-const job = require('../src/busquedaJob');
-const { importarCsv } = require('../src/services/csvImport');
+const { config, ticketOk, supabaseOk } = require('./config');
+const { KEYWORDS_DEFAULT } = require('./matcher/keywords');
+const store = require('./store/db');
+const { reevaluarCodigo } = require('./buscador');
+const { pingApi } = require('./services/mercadoPublico');
+const control = require('./busquedaControl');
+const job = require('./busquedaJob');
+const { importarCsv } = require('./services/csvImport');
 
 const app = express();
 app.use(express.json({ limit: '40mb' }));
@@ -176,9 +177,9 @@ app.get(`${BASE}/logs/:id`, async (req, res) => {
 });
 
 // ── Notificaciones ──
-app.get(`${BASE}/notificaciones`, (_req, res) => {
+app.get(`${BASE}/notificaciones`, (req, res) => {
   try {
-    res.json(store.listarNotificaciones(parseInt(_req.query.limite || '20', 10)));
+    res.json(store.listarNotificaciones(parseInt(req.query.limite || '20', 10)));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -222,7 +223,7 @@ app.post(`${BASE}/importar-csv`, async (req, res) => {
   }
 });
 
-// ── Buscar (en Vercel espera la ejecución para no congelarse) ──
+// ── Buscar ──
 app.post(`${BASE}/buscar`, async (req, res) => {
   try {
     // Por si quedó un lock fantasma sin job real
@@ -310,4 +311,3 @@ app.put(`${BASE}/config`, async (req, res) => {
 });
 
 module.exports = app;
-module.exports.handler = serverless(app);
