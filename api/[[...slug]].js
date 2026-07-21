@@ -15,6 +15,14 @@ const app = express();
 app.use(express.json({ limit: '40mb' }));
 app.use(express.text({ type: ['text/*', 'text/csv', 'application/csv'], limit: '40mb' }));
 
+// Middleware para normalizar rutas en Vercel (si Vercel remueve /api de req.url)
+app.use((req, _res, next) => {
+  if (!req.url.startsWith('/api')) {
+    req.url = '/api' + (req.url.startsWith('/') ? req.url : '/' + req.url);
+  }
+  next();
+});
+
 const BASE = '/api';
 
 app.get(`${BASE}/status`, (_req, res) => {
