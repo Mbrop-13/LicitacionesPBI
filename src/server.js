@@ -3,7 +3,7 @@
 // Servidor de desarrollo local. En Vercel se usa api/[[...slug]].js
 const path = require('path');
 const express = require('express');
-const apiApp = require('../api/[[...slug]].js');
+const apiApp = require('../api/index.js');
 const scheduler = require('./scheduler');
 const { config } = require('./config');
 const store = require('./store/db');
