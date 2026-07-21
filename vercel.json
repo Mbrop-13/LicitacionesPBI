@@ -7,7 +7,7 @@
     }
   },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/[[...slug]]" },
+    { "source": "/api/:path*", "destination": "/api/index.js" },
     { "source": "/dashboard", "destination": "/index.html" },
     { "source": "/configuracion", "destination": "/config.html" }
   ],
