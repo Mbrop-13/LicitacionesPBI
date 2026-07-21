@@ -720,14 +720,17 @@ async function statsSupabase() {
     porEstado[k] = (porEstado[k] || 0) + 1;
   }
 
-  // Descartadas: total + agrupado por motivo (desde Supabase)
+  // Descartadas: total + agrupado por motivo (un count por cada motivo conocido)
   const totalDesc = await countDescartadas();
   const porMotivoDescartes = {};
   if (totalDesc > 0) {
-    const { data: motivos } = await sb.from('descartadas').select('motivo');
-    for (const m of motivos || []) {
-      const k = m.motivo || 'otro';
-      porMotivoDescartes[k] = (porMotivoDescartes[k] || 0) + 1;
+    const motivosConocidos = ['sin_coincidencia', 'solo_formacion', 'bajo_umbral', 'no_aplica'];
+    for (const m of motivosConocidos) {
+      const { count } = await sb
+        .from('descartadas')
+        .select('*', { count: 'exact', head: true })
+        .eq('motivo', m);
+      if (count) porMotivoDescartes[m] = count;
     }
   }
 
