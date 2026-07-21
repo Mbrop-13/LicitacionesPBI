@@ -895,7 +895,9 @@ async function buscarAhora() {
   }, 1000);
 
   try {
-    // Responde al instante — no se queda colgado el HTTP
+    // En serverless (Vercel) el POST espera síncrono y devuelve el resultado
+    // final en la misma respuesta. En local responde al instante y se hace
+    // polling a /api/buscar/estado.
     const start = await api('/api/buscar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -903,6 +905,19 @@ async function buscarAhora() {
     });
     if (!start.ok && !start.started) {
       throw { error: start.error || 'No se pudo iniciar la búsqueda' };
+    }
+
+    // Modo síncrono: la búsqueda ya terminó, usar el resultado del POST
+    const terminoSync =
+      start.result ||
+      start.status === 'done' ||
+      start.status === 'cancelled' ||
+      start.status === 'error';
+    if (terminoSync) {
+      clearSearchTimers();
+      setSearchUI(false);
+      mostrarResultadoBusqueda(start);
+      return;
     }
   } catch (e) {
     if (String(e.error || e.message || '').includes('en curso')) {
@@ -925,7 +940,7 @@ async function buscarAhora() {
     return;
   }
 
-  // Polling cada 1.2s hasta que termine o el usuario detenga
+  // Polling cada 1.2s hasta que termine o el usuario detenga (solo modo local)
   searchPollTimer = setInterval(async () => {
     if (!searching) {
       clearSearchTimers();
@@ -943,40 +958,44 @@ async function buscarAhora() {
       // Terminó
       clearSearchTimers();
       setSearchUI(false);
-
-      const r = st.result;
-      if (st.status === 'cancelled' || r?.cancelada) {
-        flash(
-          'warn',
-          r
-            ? `Detenida. API <b>${r.api}</b> · guardadas <b>${r.guardadas}</b> · descartadas <b>${r.descartadas}</b>`
-            : 'Búsqueda detenida.'
-        );
-        toast('Búsqueda detenida');
-      } else if (st.status === 'error') {
-        flash('error', esc(st.error || 'Error en la búsqueda'));
-        toast(st.error || 'Error', true);
-      } else if (r) {
-        flash(
-          r.nuevas > 0 ? 'ok' : 'info',
-          `API <b>${r.api}</b> · guardadas <b>${r.guardadas}</b> (${r.nuevas} nuevas) · descartadas <b>${r.descartadas}</b>`
-        );
-        toast(`${r.nuevas} nuevas · ${r.descartadas} descartadas · ${r.api} en API`);
-        if (r.nuevas > 0) {
-          notificarNavegador('ProgramBI', `${r.nuevas} licitación(es) nueva(s)`);
-        }
-        if (r.errores?.length) {
-          flash('warn', 'Errores parciales: ' + esc(r.errores.slice(0, 2).join(' · ')));
-        }
-      }
-
-      await cargarStats();
-      await cargarNotificaciones();
-      await cargarVista();
+      mostrarResultadoBusqueda(st);
     } catch {
       /* reintento en el próximo tick */
     }
   }, 1200);
+}
+
+/** Muestra el resultado final de una búsqueda (modos síncrono y polling). */
+function mostrarResultadoBusqueda(st) {
+  const r = st.result;
+  if (st.status === 'cancelled' || r?.cancelada) {
+    flash(
+      'warn',
+      r
+        ? `Detenida. API <b>${r.api}</b> · guardadas <b>${r.guardadas}</b> · descartadas <b>${r.descartadas}</b>`
+        : 'Búsqueda detenida.'
+    );
+    toast('Búsqueda detenida');
+  } else if (st.status === 'error') {
+    flash('error', esc(st.error || 'Error en la búsqueda'));
+    toast(st.error || 'Error', true);
+  } else if (r) {
+    flash(
+      r.nuevas > 0 ? 'ok' : 'info',
+      `API <b>${r.api}</b> · guardadas <b>${r.guardadas}</b> (${r.nuevas} nuevas) · descartadas <b>${r.descartadas}</b>`
+    );
+    toast(`${r.nuevas} nuevas · ${r.descartadas} descartadas · ${r.api} en API`);
+    if (r.nuevas > 0) {
+      notificarNavegador('ProgramBI', `${r.nuevas} licitación(es) nueva(s)`);
+    }
+    if (r.errores?.length) {
+      flash('warn', 'Errores parciales: ' + esc(r.errores.slice(0, 2).join(' · ')));
+    }
+  }
+
+  cargarStats();
+  cargarNotificaciones();
+  cargarVista();
 }
 
 /** Importar CSV de Mercado Público (respaldo cuando la API trae pocas filas) */

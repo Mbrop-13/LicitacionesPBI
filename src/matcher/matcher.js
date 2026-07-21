@@ -15,24 +15,14 @@ function normalizar(texto) {
 }
 
 /**
- * Keywords muy cortas (bi, ia, sql, rpa, kpi…) deben coincidir como palabra completa,
- * no como subcadena de otras palabras.
+ * Toda keyword debe coincidir como palabra/frase completa (word boundaries),
+ * nunca como subcadena. Evita falsos positivos como "excel" en "excelencia",
+ * "bi" en "biblioteca", "sql" en "mosquitero", "kpi" en "explicito", etc.
  */
-function esKeywordCorta(kw) {
-  return kw.replace(/\s+/g, '').length <= 3;
-}
-
 function contieneKeyword(textoNorm, keywordNorm) {
   if (!keywordNorm) return false;
-  if (esKeywordCorta(keywordNorm) || !keywordNorm.includes(' ')) {
-    // palabra(s) completa(s)
-    const partes = keywordNorm.split(/\s+/).filter(Boolean);
-    if (partes.length === 1 && esKeywordCorta(partes[0])) {
-      const re = new RegExp(`(?:^|\\s)${escapeRegex(partes[0])}(?:\\s|$)`, 'i');
-      return re.test(textoNorm);
-    }
-  }
-  return textoNorm.includes(keywordNorm);
+  const re = new RegExp(`(?:^|[^\\w])${escapeRegex(keywordNorm)}(?:[^\\w]|$)`, 'i');
+  return re.test(textoNorm);
 }
 
 function escapeRegex(s) {

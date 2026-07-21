@@ -19,10 +19,17 @@ const FLUSH_CADA = 40; // persiste descartadas en disco cada N ítems
  */
 async function ejecutarBusqueda(opts = {}) {
   const origen = opts.origen || 'manual';
-  const diasAtras = opts.diasExtra ?? config.diasHaciaAtras;
+  const esVercel = !!process.env.VERCEL;
+  // En serverless hay un techo de ~60s. Acotamos días y pausas para no caer en 504.
+  const diasConfig = opts.diasExtra ?? config.diasHaciaAtras;
+  const diasAtras = esVercel ? Math.min(diasConfig, 2) : diasConfig;
+  const sleepEntreDias = esVercel ? 200 : 900;
+  const sleepPreDetalle = esVercel ? 90 : 280;
+  const maxDetalles = esVercel ? 25 : Infinity;
   const busquedaId = `b_${Date.now()}`;
   const manageControl = opts.manageControl !== false;
   const myRunId = manageControl ? control.begin() : control.currentRunId();
+  let detallesPedidos = 0;
 
   try {
   const perfil = (await store.cargarKeywords()) || undefined;
@@ -50,7 +57,7 @@ async function ejecutarBusqueda(opts = {}) {
     fecha.setDate(fecha.getDate() - offset);
     const fechaKey = fecha.toISOString().slice(0, 10);
 
-    if (offset > 0) await control.sleepCancelable(900);
+    if (offset > 0) await control.sleepCancelable(sleepEntreDias);
     if (control.isCancelled()) {
       cancelada = true;
       break;
@@ -108,15 +115,15 @@ async function ejecutarBusqueda(opts = {}) {
       let res = evaluar(lic, perfil);
 
       // Solo pedir detalle si hay indicios (más rápido y menos 429)
+      const nombresTecnicos =
+        /capaci|formaci|curso|taller|entren|excel|power\s*bi|powerbi|sql\s*server|tsql|transact|python|machine|deep\s*learning|inteligencia\s*artificial|business\s*intelligence|inteligencia\s*de\s*negocios|big\s*data|power\s*automate|power\s*apps|power\s*platform|data\s*warehouse|data\s*lake|analisis\s*de\s*datos|analitica\s*de\s*datos|e-?learning|certificacion/i.test(
+          lic.nombre || ''
+        );
       const necesitaDetalle =
         config.enriquecerDetalle &&
+        detallesPedidos < maxDetalles &&
         (!lic.descripcion || res.soloFormacion) &&
-        (res.pasa ||
-          res.soloFormacion ||
-          res.score > 0 ||
-          /capaci|formaci|curso|taller|entren|excel|power\s*bi|sql|dato|python|machine|anal[ií]tica|inteligencia|office|microsoft/i.test(
-            lic.nombre || ''
-          ));
+        (res.pasa || res.soloFormacion || nombresTecnicos);
 
       if (necesitaDetalle) {
         if (control.isCancelled()) {
@@ -124,12 +131,13 @@ async function ejecutarBusqueda(opts = {}) {
           break;
         }
         try {
-          await control.sleepCancelable(280);
+          await control.sleepCancelable(sleepPreDetalle);
           if (control.isCancelled()) {
             cancelada = true;
             break;
           }
           const det = await detallePorCodigo(lic.codigoExterno);
+          detallesPedidos++;
           if (det) {
             lic = normalizarLicitacion(det);
             res = evaluar(lic, perfil);
