@@ -1439,3 +1439,27 @@ table.data .mono { font-family: var(--mono); font-size: 0.7rem; }
   .curso-row { grid-template-columns: 1fr; }
   .detail-row { grid-template-columns: 1fr; }
 }
+
+/* ── Botón Avisos (notificaciones del navegador) ── */
+.btn-notif-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  padding: 0 12px;
+  height: 34px;
+  position: relative;
+}
+.btn-notif-toggle svg { flex-shrink: 0; }
+.btn-notif-toggle .notif-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #94a3b8;
+  display: inline-block;
+  margin-left: 6px;
+}
+@media (max-width: 640px) {
+  .btn-notif-toggle .btn-notif-txt { display: none; }
+  .btn-notif-toggle { padding: 0 8px; }
+}

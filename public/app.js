@@ -50,6 +50,9 @@ document.addEventListener('DOMContentLoaded', () => {
   cargarStats();
   cargarNotificaciones();
   cargarVista();
+  // Notificaciones automáticas mientras la web está abierta
+  iniciarVigilanciaNotificaciones();
+  registrarBotonNotificaciones();
 });
 
 function wire() {
@@ -1253,14 +1256,147 @@ async function marcarNotifLeidas() {
     /* ok */
   }
 }
-function notificarNavegador(titulo, body) {
+function notificarNavegador(titulo, body, opts = {}) {
   if (!('Notification' in window)) return;
-  if (Notification.permission === 'granted') new Notification(titulo, { body });
-  else if (Notification.permission === 'default') {
-    Notification.requestPermission().then((p) => {
-      if (p === 'granted') new Notification(titulo, { body });
+  if (Notification.permission !== 'granted') return;
+  try {
+    const n = new Notification(titulo, {
+      body,
+      tag: opts.tag || 'programbi',
+      // Reusa la misma notificación para no spamear el centro de notificaciones
+      renotify: !!opts.renotify,
+      icon:
+        'data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect width=%27100%27 height=%27100%27 rx=%2722%27 fill=%27%230a0a0a%27/%3E%3Ctext x=%2750%27 y=%2766%27 font-size=%2742%27 font-family=%27system-ui%27 font-weight=%27700%27 fill=%27white%27 text-anchor=%27middle%27%3EBI%3C/text%3E%3C/svg%3E',
     });
+    // Click en la notificación → enfoca la pestaña y abre la app
+    n.onclick = () => {
+      window.focus();
+      n.close();
+      if (opts.onClickView && VIEWS[opts.onClickView]) setView(opts.onClickView);
+    };
+  } catch {
+    /* ignore */
   }
+}
+
+/* ── Vigilancia de nuevas licitaciones (web abierta) ── */
+
+let POLL_NUEVAS_TIMER = null;
+let ULTIMAS_NUEVAS_COUNT = null; // null = aún no sabemos el baseline
+let POLL_INTERVAL_MS = 5 * 60 * 1000; // cada 5 min
+
+function iniciarVigilanciaNotificaciones() {
+  // Solo arranca si el usuario ya concedió permiso, si no, se habilita tras pulsar el botón
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  arrancarPollingNuevas();
+  // Re-verifica cuando vuelves a la pestaña (mientras estuviste en otra)
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) revisarNuevasAhora();
+  });
+}
+
+function arrancarPollingNuevas() {
+  if (POLL_NUEVAS_TIMER) clearInterval(POLL_NUEVAS_TIMER);
+  // Primera lectura inmediata: establece el baseline sin notificar
+  revisarNuevasAhora(true);
+  POLL_NUEVAS_TIMER = setInterval(() => revisarNuevasAhora(), POLL_INTERVAL_MS);
+}
+
+async function revisarNuevasAhora(esInicial = false) {
+  try {
+    const s = await api('/api/stats');
+    // noVistos cuenta las licitaciones guardadas aún no revisadas en la UI
+    const count = s.noVistos ?? 0;
+    if (ULTIMAS_NUEVAS_COUNT === null) {
+      // baseline: la primera vez NO notificamos (podría haber backlog)
+      ULTIMAS_NUEVAS_COUNT = count;
+      return;
+    }
+    if (count > ULTIMAS_NUEVAS_COUNT) {
+      const delta = count - ULTIMAS_NUEVAS_COUNT;
+      ULTIMAS_NUEVAS_COUNT = count;
+      if (!esInicial) {
+        notificarNavegador(
+          '🎓 ProgramBI — Nuevas licitaciones',
+          `${delta} licitación(es) nueva(s) que coinciden con tu perfil. Abre la app para verlas.`,
+          { tag: 'nuevas', renotify: true, onClickView: 'pendientes' }
+        );
+        // Refresca la vista silenciosamente
+        cargarStats();
+        cargarNotificaciones();
+        if (view === 'todas' || view === 'pendientes') cargarVista();
+      }
+    } else if (count < ULTIMAS_NUEVAS_COUNT) {
+      // Las vieron/marcaron visto → actualizar baseline
+      ULTIMAS_NUEVAS_COUNT = count;
+    }
+  } catch {
+    /* reintento en el próximo tick */
+  }
+}
+
+/* ── Botón para activar/desactivar notificaciones ── */
+
+function registrarBotonNotificaciones() {
+  const btn = document.getElementById('btn-notif-toggle');
+  if (!btn) return;
+  actualizarUIBotonNotif();
+  btn.addEventListener('click', async () => {
+    if (!('Notification' in window)) {
+      toast('Tu navegador no soporta notificaciones', true);
+      return;
+    }
+    if (Notification.permission === 'granted') {
+      // Ya activado: probamos con una notificación de prueba
+      notificarNavegador(
+        '🎓 ProgramBI',
+        'Notificaciones activadas. Te avisaré cuando el cron detecte licitaciones nuevas (mientras tengas la web abierta).',
+        { tag: 'prueba' }
+      );
+      arrancarPollingNuevas();
+      actualizarUIBotonNotif();
+    } else if (Notification.permission !== 'denied') {
+      const perm = await Notification.requestPermission();
+      if (perm === 'granted') {
+        arrancarPollingNuevas();
+        actualizarUIBotonNotif();
+        notificarNavegador('🎓 ProgramBI', '¡Listo! Te avisaré de las nuevas licitaciones.', {
+          tag: 'prueba',
+        });
+      } else {
+        actualizarUIBotonNotif();
+        toast('Permiso de notificaciones denegado', true);
+      }
+    } else {
+      toast(
+        'Bloqueaste las notificaciones. Actívalas en el icono del candado en la barra del navegador.',
+        true
+      );
+    }
+  });
+}
+
+function actualizarUIBotonNotif() {
+  const btn = document.getElementById('btn-notif-toggle');
+  if (!btn) return;
+  if (!('Notification' in window)) {
+    btn.hidden = true;
+    return;
+  }
+  const perm = Notification.permission;
+  const dot = btn.querySelector('.notif-dot') || document.createElement('span');
+  dot.className = 'notif-dot';
+  dot.style.cssText =
+    'display:inline-block;width:8px;height:8px;border-radius:50%;margin-left:8px;background:' +
+    (perm === 'granted' ? '#22c55e' : perm === 'denied' ? '#ef4444' : '#94a3b8') +
+    ';';
+  if (!dot.parentNode) btn.appendChild(dot);
+  btn.title =
+    perm === 'granted'
+      ? 'Notificaciones activadas'
+      : perm === 'denied'
+      ? 'Notificaciones bloqueadas por el navegador'
+      : 'Activar notificaciones del navegador';
 }
 
 /* ── helpers ── */
