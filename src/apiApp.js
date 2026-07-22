@@ -101,6 +101,14 @@ app.post(`${BASE}/licitaciones/:codigo/visto`, async (req, res) => {
   }
 });
 
+app.post(`${BASE}/licitaciones/:codigo/descartar`, async (req, res) => {
+  try {
+    res.json(await store.descartarLicitacion(req.params.codigo));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.post(`${BASE}/licitaciones/marcar-vistas`, async (req, res) => {
   try {
     res.json(await store.marcarTodasVistas(req.body?.valor !== false));

@@ -567,6 +567,45 @@ async function salvarDescartada(codigo, opts = {}) {
   return { ok: true, yaExistia: false, lic: await obtenerPorCodigo(codigo) };
 }
 
+async function quitarDeLicitaciones(codigo) {
+  if (useSupabase()) {
+    const sb = getSupabase();
+    await sb.from('licitaciones').delete().eq('codigo_externo', codigo);
+    return;
+  }
+  const all = readJson(FILE_LIC, []);
+  const next = all.filter((x) => x.codigoExterno !== codigo);
+  if (next.length !== all.length) writeJson(FILE_LIC, next);
+}
+
+async function descartarLicitacion(codigo) {
+  const lic = await obtenerPorCodigo(codigo);
+  if (!lic) {
+    return { ok: true, yaDescartada: true };
+  }
+
+  const slim = {
+    codigoExterno: lic.codigoExterno,
+    nombre: lic.nombre,
+    nombreOrganismo: lic.nombreOrganismo,
+    estado: lic.estado,
+    fechaPublicacion: lic.fechaPublicacion,
+    fechaCierre: lic.fechaCierre,
+    urlFicha: lic.urlFicha,
+    score: lic.score || 0,
+    scoreTecnico: lic.scoreTecnico || 0,
+    afinidad: lic.afinidad || 0,
+    motivo: 'descarte_manual',
+    cursos: (lic.cursos || []).map((c) => ({ id: c.id, nombre: c.nombre })),
+    coincidencias: (lic.cursos || []).flatMap((c) => c.coincidencias || []).slice(0, 10),
+  };
+
+  await registrarDescartes([slim], { busquedaId: 'descarte_manual' });
+  await quitarDeLicitaciones(codigo);
+
+  return { ok: true, descartada: true };
+}
+
 async function listarDescartadas(filtros = {}) {
   if (useSupabase()) return listarDescartadasSupabase(filtros);
   return listarDescartadasLocal(filtros);
@@ -1244,6 +1283,7 @@ module.exports = {
   listarDescartadas,
   obtenerDescartada,
   salvarDescartada,
+  descartarLicitacion,
   countDescartadas,
   PAGE_SIZE_DEFAULT,
   stats,

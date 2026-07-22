@@ -1062,9 +1062,47 @@ button { cursor: pointer; border: none; background: none; }
   box-shadow: var(--shadow-md);
 }
 .lic-card.unread { border-left: 3px solid var(--black); }
+.lic-card.deadline-red {
+  border: 2px solid #ef4444 !important;
+  background-color: #fff8f8;
+}
+.lic-card.deadline-orange {
+  border: 2px solid #f97316 !important;
+  background-color: #fffbf5;
+}
 .lic-card.discard {
   cursor: default;
   opacity: 0.98;
+}
+.deadline-chip-red {
+  background-color: #fef2f2 !important;
+  color: #dc2626 !important;
+  border: 1px solid #fecaca !important;
+  font-weight: 700 !important;
+}
+.deadline-chip-orange {
+  background-color: #fff7ed !important;
+  color: #ea580c !important;
+  border: 1px solid #ffedd5 !important;
+  font-weight: 700 !important;
+}
+.card-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.3rem;
+  justify-content: flex-end;
+}
+.btn-descartar-item {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  padding: 2px 8px;
+  border-radius: 6px;
+  transition: background 0.15s, color 0.15s;
+}
+.btn-descartar-item:hover {
+  color: var(--danger);
+  background-color: var(--danger-bg);
 }
 .lic-card-main { min-width: 0; }
 .lic-card-top {

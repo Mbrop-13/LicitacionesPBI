@@ -80,6 +80,7 @@ function wire() {
   document.getElementById('overlay').addEventListener('click', cerrarDrawer);
   document.getElementById('btn-close-drawer').addEventListener('click', cerrarDrawer);
   document.getElementById('drawer-fav').addEventListener('click', toggleFavDetalle);
+  document.getElementById('drawer-descartar')?.addEventListener('click', descartarDetalleActual);
 
   document.getElementById('btn-menu').addEventListener('click', () => {
     if (window.innerWidth <= 960) openSidebarMobile();
@@ -734,6 +735,48 @@ function renderOportunidades(lista) {
   bindOportunidadCards(host);
 }
 
+function obtenerInfoCierre(fechaCierre) {
+  if (!fechaCierre) return { clase: '', badge: '', texto: 'Cierre sin fecha' };
+  const d = new Date(fechaCierre);
+  if (isNaN(d.getTime())) return { clase: '', badge: '', texto: `Cierre ${fechaCierre}` };
+
+  const ms = d.getTime() - Date.now();
+  const horas = ms / (1000 * 60 * 60);
+
+  const fechaFormat = d.toLocaleDateString('es-CL', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  if (horas <= 24) {
+    // Menos de 24h o ya vencida -> Borde Rojo
+    const msg = horas <= 0 ? 'Vencida / En Cierre' : `Cierra en ${Math.max(1, Math.round(horas))}h`;
+    return {
+      clase: 'deadline-red',
+      badge: `<span class="chip deadline-chip-red" title="${fechaFormat}">🚨 ${msg}</span>`,
+      texto: `Cierra: ${fechaFormat}`,
+    };
+  } else if (horas <= 48) {
+    // Menos de 2 días (entre 24h y 48h) -> Borde Naranjo
+    const dias = Math.round((horas / 24) * 10) / 10;
+    return {
+      clase: 'deadline-orange',
+      badge: `<span class="chip deadline-chip-orange" title="${fechaFormat}">⚠️ Cierra en ${dias}d</span>`,
+      texto: `Cierra: ${fechaFormat}`,
+    };
+  } else {
+    // Más de 2 días -> Sin borde especial
+    return {
+      clase: '',
+      badge: '',
+      texto: `Cierra: ${fechaFormat}`,
+    };
+  }
+}
+
 function cardOportunidad(lic) {
   const cursos = lic.cursos || [];
   const chips = cursos
@@ -745,26 +788,32 @@ function cardOportunidad(lic) {
     .join('');
   const more = cursos.length > 4 ? `<span class="chip">+${cursos.length - 4}</span>` : '';
   const aff = Math.min(100, lic.afinidad || 0);
+  const infoCierre = obtenerInfoCierre(lic.fechaCierre);
+
   return `
-  <article class="lic-card ${lic.visto ? '' : 'unread'}" data-cod="${esc(lic.codigoExterno)}" role="button" tabindex="0">
+  <article class="lic-card ${lic.visto ? '' : 'unread'} ${infoCierre.clase}" data-cod="${esc(lic.codigoExterno)}" role="button" tabindex="0">
     <div class="lic-card-main">
       <div class="lic-card-top">
         <span class="lic-code">${esc(lic.codigoExterno)}</span>
         <span class="estado ${claseEstado(lic.estado)}">${esc(lic.estado || '—')}</span>
+        ${infoCierre.badge}
         ${lic.guardadoManual ? '<span class="chip warn">Manual</span>' : ''}
         ${lic.visto ? '<span class="chip">Procesada</span>' : '<span class="chip tech">Nueva</span>'}
       </div>
       <div class="lic-title">${esc(lic.nombre || '(sin nombre)')}</div>
       <div class="lic-meta">
         <span>${esc(lic.nombreOrganismo || 'Organismo no indicado')}</span>
-        <span>Cierre ${formatearFechaCorta(lic.fechaCierre)}</span>
+        <strong style="color:var(--text);">${infoCierre.texto}</strong>
         <span>${relativo(lic.creadoEn)}</span>
       </div>
     </div>
     <div class="lic-side">
       <div class="chips">${chips}${more}</div>
       <div class="aff"><div class="aff-bar"><i style="width:${aff}%"></i></div>${aff}%</div>
-      <button type="button" class="star-btn ${lic.esFavorito ? 'on' : ''}" data-star="${esc(lic.codigoExterno)}">${lic.esFavorito ? starFilled() : starEmpty()}</button>
+      <div class="card-actions-row">
+        <button type="button" class="btn btn-ghost btn-sm btn-descartar-item" data-descartar="${esc(lic.codigoExterno)}" title="Descartar licitación">Descartar</button>
+        <button type="button" class="star-btn ${lic.esFavorito ? 'on' : ''}" data-star="${esc(lic.codigoExterno)}">${lic.esFavorito ? starFilled() : starEmpty()}</button>
+      </div>
     </div>
   </article>`;
 }
@@ -772,7 +821,7 @@ function cardOportunidad(lic) {
 function bindOportunidadCards(host) {
   host.querySelectorAll('.lic-card').forEach((card) => {
     card.addEventListener('click', (e) => {
-      if (e.target.closest('[data-star]')) return;
+      if (e.target.closest('[data-star]') || e.target.closest('[data-descartar]')) return;
       abrirDetalle(card.dataset.cod);
     });
   });
@@ -782,6 +831,39 @@ function bindOportunidadCards(host) {
       await toggleFav(btn.dataset.star, btn);
     });
   });
+  host.querySelectorAll('[data-descartar]').forEach((btn) => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await descartarOportunidadAccion(btn.dataset.descartar, btn);
+    });
+  });
+}
+
+async function descartarOportunidadAccion(codigo, btn) {
+  if (!confirm(`¿Deseas mover la licitación ${codigo} a la sección Descartadas?`)) return;
+  if (btn) btn.disabled = true;
+  try {
+    const res = await api(`/api/licitaciones/${encodeURIComponent(codigo)}/descartar`, {
+      method: 'POST',
+    });
+    if (res.ok) {
+      toast(`Licitación ${codigo} movida a descartadas`);
+      const card = document.querySelector(`.lic-card[data-cod="${codigo}"]`);
+      if (card) card.remove();
+      cargarStats();
+    }
+  } catch (e) {
+    toast(e.error || e.message || 'No se pudo descartar', true);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function descartarDetalleActual() {
+  if (!detalleActual) return;
+  const codigo = detalleActual.codigoExterno;
+  cerrarDrawer();
+  await descartarOportunidadAccion(codigo, null);
 }
 
 /* ── Descartadas ── */
