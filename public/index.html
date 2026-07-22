@@ -270,6 +270,19 @@
         </section>
 
         <section class="modal-block">
+          <h3>Mantenimiento y Licitaciones Vencidas</h3>
+          <div class="field-inline" style="margin-bottom:0.75rem;">
+            <label for="cfg-auto-limpiar-vencidas" style="cursor:pointer;">Depurar vencidas automáticamente</label>
+            <input type="checkbox" id="cfg-auto-limpiar-vencidas" checked style="width:20px; height:20px; cursor:pointer;">
+          </div>
+          <p class="hint">Al buscar, mueve automáticamente las licitaciones expiradas a Descartadas.</p>
+          <div class="actions-row">
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-limpiar-vencidas">🧹 Limpiar vencidas ahora</button>
+            <span class="save-msg" id="limpiar-vencidas-msg" style="margin:0"></span>
+          </div>
+        </section>
+
+        <section class="modal-block">
           <h3>Notificaciones</h3>
           <p class="hint" style="margin-bottom:0">
             Opcional en <code>.env</code>: <code>NOTIFY_WEBHOOK_URL</code> · <code>NOTIFY_EMAIL</code>

@@ -330,7 +330,7 @@ app.put(`${BASE}/config`, async (req, res) => {
       await store.resetKeywords();
       return res.json({ ok: true, reset: true, data: KEYWORDS_DEFAULT });
     }
-    const { umbral, cursos, requireTecnico } = body;
+    const { umbral, cursos, requireTecnico, autoLimpiarVencidas } = body;
     if (typeof umbral !== 'number' || !Array.isArray(cursos)) {
       return res.status(400).json({ error: 'Se esperan { umbral: number, cursos: [] }' });
     }
@@ -338,8 +338,17 @@ app.put(`${BASE}/config`, async (req, res) => {
       umbral,
       cursos,
       requireTecnico: requireTecnico !== false,
+      autoLimpiarVencidas: autoLimpiarVencidas !== false,
     });
     res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post(`${BASE}/licitaciones/limpiar-vencidas`, async (_req, res) => {
+  try {
+    res.json(await store.limpiarLicitacionesVencidas());
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

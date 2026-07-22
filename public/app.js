@@ -97,6 +97,7 @@ function wire() {
   });
   document.getElementById('btn-save-config').addEventListener('click', guardarConfig);
   document.getElementById('btn-reset-config').addEventListener('click', resetConfig);
+  document.getElementById('btn-limpiar-vencidas')?.addEventListener('click', limpiarVencidasAhora);
   document.getElementById('btn-add-curso').addEventListener('click', () => {
     cursosEdicion.push({ id: 'curso_' + Date.now(), nombre: 'Nuevo curso', keywords: [] });
     renderEditor();
@@ -738,9 +739,10 @@ function renderOportunidades(lista) {
 function obtenerInfoCierre(fechaCierre) {
   if (!fechaCierre) return { clase: '', badge: '', texto: 'Cierre sin fecha' };
   const d = new Date(fechaCierre);
-  if (isNaN(d.getTime())) return { clase: '', badge: '', texto: `Cierre ${fechaCierre}` };
+  if (isNaN(d.getTime())) return { clase: '', badge: '', texto: `Cierra: ${fechaCierre}` };
 
-  const ms = d.getTime() - Date.now();
+  const ahora = Date.now();
+  const ms = d.getTime() - ahora;
   const horas = ms / (1000 * 60 * 60);
 
   const fechaFormat = d.toLocaleDateString('es-CL', {
@@ -750,29 +752,39 @@ function obtenerInfoCierre(fechaCierre) {
     hour: '2-digit',
     minute: '2-digit',
   });
+  const horaFormat = d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
 
-  if (horas <= 24) {
-    // Menos de 24h o ya vencida -> Borde Rojo
-    const msg = horas <= 0 ? 'Vencida / En Cierre' : `Cierra en ${Math.max(1, Math.round(horas))}h`;
+  if (ms <= 0) {
+    // Vencida / Cerrada -> Borde Rojo con opacidad
+    return {
+      clase: 'deadline-red deadline-expired',
+      badge: `<span class="chip deadline-chip-red" title="Finalizó el ${fechaFormat}">🛑 Licitación Vencida (${fechaFormat})</span>`,
+      texto: `Finalizó: ${fechaFormat}`,
+    };
+  } else if (horas <= 24) {
+    // Cierra Hoy (menos de 24 horas restantes) -> Borde Rojo Urgente
+    const h = Math.max(1, Math.round(horas));
     return {
       clase: 'deadline-red',
-      badge: `<span class="chip deadline-chip-red" title="${fechaFormat}">🚨 ${msg}</span>`,
-      texto: `Cierra: ${fechaFormat}`,
+      badge: `<span class="chip deadline-chip-red" title="${fechaFormat}">🚨 Cierra hoy (${horaFormat}) · Quedan ${h}h</span>`,
+      texto: `🚨 Cierra hoy ${horaFormat} (Quedan ${h}h)`,
     };
   } else if (horas <= 48) {
-    // Menos de 2 días (entre 24h y 48h) -> Borde Naranjo
-    const dias = Math.round((horas / 24) * 10) / 10;
+    // Cierra Mañana (entre 24h y 48h) -> Borde Naranjo
+    const hRestantes = Math.round(horas - 24);
+    const msgTiempo = hRestantes > 0 ? `1 día y ${hRestantes}h` : '1 día';
     return {
       clase: 'deadline-orange',
-      badge: `<span class="chip deadline-chip-orange" title="${fechaFormat}">⚠️ Cierra en ${dias}d</span>`,
-      texto: `Cierra: ${fechaFormat}`,
+      badge: `<span class="chip deadline-chip-orange" title="${fechaFormat}">⚠️ Cierra mañana (${horaFormat})</span>`,
+      texto: `⚠️ Cierra mañana ${horaFormat} (Falta ${msgTiempo})`,
     };
   } else {
-    // Más de 2 días -> Sin borde especial
+    // Más de 2 días -> Vigente sin borde especial
+    const dias = Math.round(horas / 24);
     return {
       clase: '',
       badge: '',
-      texto: `Cierra: ${fechaFormat}`,
+      texto: `📅 Cierra el ${fechaFormat} (Faltan ${dias} días)`,
     };
   }
 }
@@ -1491,6 +1503,8 @@ async function openConfig() {
     cursosEdicion = JSON.parse(JSON.stringify(cfg.cursos || []));
     document.getElementById('cfg-umbral').value = cfg.umbral ?? 1;
     requireTecnico = cfg.requireTecnico !== false;
+    const chkClean = document.getElementById('cfg-auto-limpiar-vencidas');
+    if (chkClean) chkClean.checked = cfg.autoLimpiarVencidas !== false;
     renderEditor();
   } catch (e) {
     document.getElementById('save-msg').textContent = e.error || e.message;
@@ -1549,6 +1563,7 @@ function renderEditor() {
 
 async function guardarConfig() {
   const umbral = parseInt(document.getElementById('cfg-umbral').value, 10);
+  const autoLimpiarVencidas = document.getElementById('cfg-auto-limpiar-vencidas')?.checked !== false;
   const msg = document.getElementById('save-msg');
   cursosEdicion.forEach((c) => {
     if (!c.id) c.id = (c.nombre || 'curso').toLowerCase().replace(/\s+/g, '-');
@@ -1557,7 +1572,7 @@ async function guardarConfig() {
     await api('/api/config', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ umbral, cursos: cursosEdicion, requireTecnico }),
+      body: JSON.stringify({ umbral, cursos: cursosEdicion, requireTecnico, autoLimpiarVencidas }),
     });
     msg.style.color = 'var(--ok)';
     msg.textContent = 'Guardado.';
@@ -1565,6 +1580,36 @@ async function guardarConfig() {
   } catch (e) {
     msg.style.color = 'var(--danger)';
     msg.textContent = e.error || e.message;
+  }
+}
+
+async function limpiarVencidasAhora() {
+  const msg = document.getElementById('limpiar-vencidas-msg');
+  const btn = document.getElementById('btn-limpiar-vencidas');
+  if (btn) btn.disabled = true;
+  if (msg) {
+    msg.style.color = 'var(--text)';
+    msg.textContent = 'Depurando...';
+  }
+  try {
+    const res = await api('/api/licitaciones/limpiar-vencidas', { method: 'POST' });
+    if (res.ok) {
+      const n = res.limpiadas || 0;
+      if (msg) {
+        msg.style.color = 'var(--ok)';
+        msg.textContent = n > 0 ? `¡Listo! Se depuraron ${n} vencidas.` : 'Sin licitaciones vencidas.';
+      }
+      toast(n > 0 ? `Se movieron ${n} licitación(es) vencidas a Descartadas` : 'No hay licitaciones vencidas');
+      cargarStats();
+      if (view !== 'inicio') cargarVista();
+    }
+  } catch (e) {
+    if (msg) {
+      msg.style.color = 'var(--danger)';
+      msg.textContent = e.error || e.message;
+    }
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 

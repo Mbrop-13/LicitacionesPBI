@@ -231,6 +231,18 @@ async function ejecutarBusqueda(opts = {}) {
     store.pushNotificacionInbox(nuevasLicitaciones);
   }
 
+  // Depuración automática de licitaciones vencidas si la opción está activa
+  if (perfil?.autoLimpiarVencidas !== false) {
+    try {
+      const limpia = await store.limpiarLicitacionesVencidas();
+      if (limpia.limpiadas > 0) {
+        console.log(`[buscador] Se depuraron automáticamente ${limpia.limpiadas} licitación(es) vencida(s).`);
+      }
+    } catch (e) {
+      console.warn('[buscador] error limpieza vencidas:', e.message);
+    }
+  }
+
   const result = {
     busquedaId,
     api: totalApi,

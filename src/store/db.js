@@ -1199,6 +1199,77 @@ async function resetKeywords() {
   if (fs.existsSync(FILE_CFG)) fs.unlinkSync(FILE_CFG);
 }
 
+async function limpiarLicitacionesVencidas() {
+  const ahora = new Date().getTime();
+  let vencidas = [];
+
+  if (useSupabase()) {
+    const sb = getSupabase();
+    const { data } = await sb
+      .from('licitaciones')
+      .select('*')
+      .lt('fecha_cierre', new Date().toISOString());
+
+    if (data && data.length) {
+      vencidas = data.map(mapearLicitacionSupabase);
+      const codigos = vencidas.map((l) => l.codigoExterno);
+
+      const descartes = vencidas.map((l) => ({
+        codigoExterno: l.codigoExterno,
+        nombre: l.nombre,
+        nombreOrganismo: l.nombreOrganismo,
+        estado: 'Vencida',
+        fechaPublicacion: l.fechaPublicacion,
+        fechaCierre: l.fechaCierre,
+        urlFicha: l.urlFicha,
+        score: l.score || 0,
+        scoreTecnico: l.scoreTecnico || 0,
+        afinidad: l.afinidad || 0,
+        motivo: 'vencida_auto',
+        cursos: (l.cursos || []).map((c) => ({ id: c.id, nombre: c.nombre })),
+      }));
+
+      await registrarDescartes(descartes, { busquedaId: 'limpieza_vencidas' });
+      await sb.from('licitaciones').delete().in('codigo_externo', codigos);
+    }
+  } else {
+    const todas = readJson(FILE_LIC, []);
+    const vigentes = [];
+
+    for (const lic of todas) {
+      if (lic.fechaCierre) {
+        const msCierre = new Date(lic.fechaCierre).getTime();
+        if (!isNaN(msCierre) && msCierre < ahora) {
+          vencidas.push(lic);
+          continue;
+        }
+      }
+      vigentes.push(lic);
+    }
+
+    if (vencidas.length) {
+      writeJson(FILE_LIC, vigentes);
+      const descartes = vencidas.map((l) => ({
+        codigoExterno: l.codigoExterno,
+        nombre: l.nombre,
+        nombreOrganismo: l.nombreOrganismo,
+        estado: 'Vencida',
+        fechaPublicacion: l.fechaPublicacion,
+        fechaCierre: l.fechaCierre,
+        urlFicha: l.urlFicha,
+        score: l.score || 0,
+        scoreTecnico: l.scoreTecnico || 0,
+        afinidad: l.afinidad || 0,
+        motivo: 'vencida_auto',
+        cursos: (l.cursos || []).map((c) => ({ id: c.id, nombre: c.nombre })),
+      }));
+      await registrarDescartes(descartes, { busquedaId: 'limpieza_vencidas' });
+    }
+  }
+
+  return { ok: true, limpiadas: vencidas.length, codigos: vencidas.map((v) => v.codigoExterno) };
+}
+
 // ───────────────── Notificaciones ─────────────────
 
 function pushNotificacionInbox(items) {
@@ -1295,6 +1366,7 @@ module.exports = {
   cargarKeywords,
   guardarKeywords,
   resetKeywords,
+  limpiarLicitacionesVencidas,
   pushNotificacionInbox,
   listarNotificaciones,
   marcarNotificacionesLeidas,
