@@ -8,7 +8,10 @@ const path = require('path');
 const { config, supabaseOk } = require('../config');
 const { KEYWORDS_DEFAULT } = require('../matcher/keywords');
 
-const DATA_DIR = path.join(__dirname, '..', '..', 'data');
+const DATA_DIR = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME
+  ? path.join('/tmp', 'licitaciones_data')
+  : path.join(__dirname, '..', '..', 'data');
+
 const FILE_LIC = path.join(DATA_DIR, 'licitaciones.json');
 const FILE_LOGS = path.join(DATA_DIR, 'logs.json');
 const FILE_CFG = path.join(DATA_DIR, 'config.json');
@@ -35,7 +38,11 @@ function getSupabase() {
 }
 
 function ensureDataDir() {
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+  try {
+    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+  } catch (e) {
+    console.warn('[store] Advertencia al crear DATA_DIR:', e.message);
+  }
 }
 
 function readJson(file, fallback) {
@@ -49,8 +56,12 @@ function readJson(file, fallback) {
 }
 
 function writeJson(file, data) {
-  ensureDataDir();
-  fs.writeFileSync(file, JSON.stringify(data, null, 2), 'utf8');
+  try {
+    ensureDataDir();
+    fs.writeFileSync(file, JSON.stringify(data, null, 2), 'utf8');
+  } catch (e) {
+    console.warn('[store] Advertencia al escribir archivo local:', e.message);
+  }
 }
 
 function estaConfigurado() {
