@@ -1224,6 +1224,148 @@ button { cursor: pointer; border: none; background: none; }
   justify-content: flex-end;
 }
 
+/* ─── Vista Calendario Interactivo ─── */
+.cal-container {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 1.5rem;
+}
+.cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--border);
+}
+.cal-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+.cal-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--text);
+}
+.cal-legend {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.75rem;
+  flex-wrap: wrap;
+}
+.cal-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--text-secondary);
+}
+.cal-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.cal-days-header {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+.cal-day {
+  min-height: 100px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: background 0.15s;
+}
+.cal-day.other-month {
+  opacity: 0.45;
+  background: var(--bg);
+}
+.cal-day.today {
+  border: 2px solid var(--black);
+  background: var(--surface);
+}
+.cal-day-num {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.cal-day.today .cal-day-num {
+  color: var(--text);
+}
+.cal-event-chip {
+  font-size: 0.7rem;
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  line-height: 1.25;
+  transition: transform 0.1s, box-shadow 0.1s;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cal-event-chip:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+.cal-event-chip.red {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #dc2626;
+  font-weight: 600;
+}
+.cal-event-chip.orange {
+  background: #fff7ed;
+  border-color: #ffedd5;
+  color: #ea580c;
+  font-weight: 600;
+}
+.cal-event-chip.blue {
+  background: #f0f9ff;
+  border-color: #bae6fd;
+  color: #0284c7;
+}
+
+@media (max-width: 640px) {
+  .cal-day {
+    min-height: 70px;
+    padding: 3px;
+  }
+  .cal-event-chip {
+    font-size: 0.65rem;
+    padding: 2px 4px;
+  }
+}
+
 /* Empty */
 .state-box {
   background: var(--surface);

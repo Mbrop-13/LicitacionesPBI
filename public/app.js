@@ -23,6 +23,10 @@ const VIEWS = {
     title: 'Historial',
     sub: 'Cada escaneo: API / guardadas / descartadas por día',
   },
+  calendario: {
+    title: 'Calendario de Cierres',
+    sub: 'Visualización interactiva de fechas límite de ofertas',
+  },
 };
 
 let view = 'inicio';
@@ -33,6 +37,7 @@ let listaActual = [];
 let detalleActual = null;
 let cursosEdicion = [];
 let requireTecnico = true;
+let calFechaActual = new Date();
 
 const filtros = { q: '', curso: '', estado: '', orden: '' };
 const filtrosDesc = { q: '', motivo: '' };
@@ -262,12 +267,14 @@ function setView(name, load = true, updateHistory = true) {
   const isInicio = name === 'inicio';
   const isDesc = name === 'descartadas';
   const isHist = name === 'historial';
+  const isCal = name === 'calendario';
 
   const dashHost = document.getElementById('dashboard-host');
   const filtersOp = document.getElementById('filters-oportunidades');
   const filtersDesc = document.getElementById('filters-descartadas');
   const lista = document.getElementById('lista');
   const histHost = document.getElementById('historial-host');
+  const calHost = document.getElementById('calendario-host');
   const btnCsv = document.getElementById('btn-csv');
   const btnMarkAll = document.getElementById('btn-mark-all');
   const pagination = document.getElementById('pagination');
@@ -277,32 +284,36 @@ function setView(name, load = true, updateHistory = true) {
     dashHost.style.display = isInicio ? 'flex' : 'none';
   }
   if (filtersOp) {
-    filtersOp.hidden = isDesc || isHist || isInicio;
-    filtersOp.style.display = (isDesc || isHist || isInicio) ? 'none' : 'flex';
+    filtersOp.hidden = isDesc || isHist || isCal || isInicio;
+    filtersOp.style.display = (isDesc || isHist || isCal || isInicio) ? 'none' : 'flex';
   }
   if (filtersDesc) {
     filtersDesc.hidden = !isDesc;
     filtersDesc.style.display = isDesc ? 'flex' : 'none';
   }
   if (lista) {
-    lista.hidden = isHist || isInicio;
-    lista.style.display = (isHist || isInicio) ? 'none' : 'grid';
+    lista.hidden = isHist || isCal || isInicio;
+    lista.style.display = (isHist || isCal || isInicio) ? 'none' : 'grid';
   }
   if (histHost) {
     histHost.hidden = !isHist;
     histHost.style.display = isHist ? 'block' : 'none';
   }
+  if (calHost) {
+    calHost.hidden = !isCal;
+    calHost.style.display = isCal ? 'block' : 'none';
+  }
   if (btnCsv) {
-    btnCsv.hidden = isHist;
-    btnCsv.style.display = isHist ? 'none' : 'inline-flex';
+    btnCsv.hidden = isHist || isCal;
+    btnCsv.style.display = (isHist || isCal) ? 'none' : 'inline-flex';
   }
   if (btnMarkAll) {
-    btnMarkAll.hidden = isDesc || isHist || isInicio;
-    btnMarkAll.style.display = (isDesc || isHist || isInicio) ? 'none' : 'inline-flex';
+    btnMarkAll.hidden = isDesc || isHist || isCal || isInicio;
+    btnMarkAll.style.display = (isDesc || isHist || isCal || isInicio) ? 'none' : 'inline-flex';
   }
   if (pagination) {
-    pagination.hidden = isHist || isInicio;
-    pagination.style.display = (isHist || isInicio) ? 'none' : 'flex';
+    pagination.hidden = isHist || isCal || isInicio;
+    pagination.style.display = (isHist || isCal || isInicio) ? 'none' : 'flex';
   }
 
   if (updateHistory) {
@@ -327,6 +338,11 @@ async function cargarVista() {
     const p = document.getElementById('pagination');
     if (p) { p.hidden = true; p.style.display = 'none'; }
     return cargarHistorial();
+  }
+  if (view === 'calendario') {
+    const p = document.getElementById('pagination');
+    if (p) { p.hidden = true; p.style.display = 'none'; }
+    return cargarCalendario();
   }
   if (view === 'descartadas') return cargarDescartadas();
   return cargarOportunidades();
@@ -1114,10 +1130,204 @@ async function abrirDetalle(codigo) {
         }
       </div>`;
     document.getElementById('drawer-link').href = lic.urlFicha || '#';
+    const gcalBtn = document.getElementById('drawer-gcal');
+    if (gcalBtn) gcalBtn.href = generarGoogleCalendarUrl(lic);
+    const icalBtn = document.getElementById('drawer-ical');
+    if (icalBtn) icalBtn.onclick = () => descargarICal(lic);
     updateDrawerFavBtn();
     cargarStats();
   } catch (e) {
     body.innerHTML = `<p style="color:var(--danger)">${esc(e.error || e.message)}</p>`;
+  }
+}
+
+/* ── Calendario Interactivo ── */
+
+function generarGoogleCalendarUrl(lic) {
+  if (!lic) return '#';
+  const cod = lic.codigoExterno || '';
+  const nom = lic.nombre || 'Licitación';
+  const org = lic.nombreOrganismo || '';
+  const url = lic.urlFicha || '';
+
+  let dStart = new Date(lic.fechaCierre);
+  if (isNaN(dStart.getTime())) dStart = new Date();
+  const dEnd = new Date(dStart.getTime() + 60 * 60 * 1000);
+
+  const toIsoBasic = (d) => d.toISOString().replace(/-|:|\.\d+/g, '');
+  const dates = `${toIsoBasic(dStart)}/${toIsoBasic(dEnd)}`;
+
+  const details = `Cierre de Licitación Mercado Público\n\nOrganismo: ${org}\nCódigo: ${cod}\nFicha: ${url}`;
+
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('CIERRE LICITACIÓN: ' + cod + ' - ' + nom)}&dates=${dates}&details=${encodeURIComponent(details)}&location=Mercado+Público+Chile`;
+}
+
+function descargarICal(lic) {
+  if (!lic) return;
+  const cod = lic.codigoExterno || 'licitacion';
+  const nom = (lic.nombre || 'Licitacion').replace(/\r?\n|\r/g, ' ');
+  const org = (lic.nombreOrganismo || '').replace(/\r?\n|\r/g, ' ');
+  const url = lic.urlFicha || '';
+
+  let dStart = new Date(lic.fechaCierre);
+  if (isNaN(dStart.getTime())) dStart = new Date();
+  const dEnd = new Date(dStart.getTime() + 60 * 60 * 1000);
+
+  const toIsoBasic = (d) => d.toISOString().replace(/-|:|\.\d+/g, '');
+
+  const icsContent = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//ProgramBI//Licitaciones Mercado Publico//ES',
+    'BEGIN:VEVENT',
+    `SUMMARY:CIERRE LICITACIÓN: ${cod} - ${nom}`,
+    `DESCRIPTION:Organismo: ${org}\\nFicha: ${url}`,
+    `DTSTART:${toIsoBasic(dStart)}`,
+    `DTEND:${toIsoBasic(dEnd)}`,
+    `URL:${url}`,
+    'STATUS:CONFIRMED',
+    'END:VEVENT',
+    'END:VCALENDAR'
+  ].join('\r\n');
+
+  const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `cierre-licitacion-${cod}.ics`;
+  link.click();
+  toast('Archivo iCal (.ics) descargado');
+}
+
+async function cargarCalendario() {
+  const host = document.getElementById('calendario-host');
+  if (!host) return;
+
+  host.innerHTML = skeletonCards(2);
+  setText('results-count', 'Cargando agenda…');
+
+  try {
+    const data = await api('/api/licitaciones?pageSize=200');
+    const items = data.items || data || [];
+
+    const año = calFechaActual.getFullYear();
+    const mes = calFechaActual.getMonth();
+
+    const mesesNombres = [
+      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ];
+
+    const primerDia = new Date(año, mes, 1);
+    const ultimoDia = new Date(año, mes + 1, 0);
+
+    let diaSemanaInicio = primerDia.getDay() - 1;
+    if (diaSemanaInicio === -1) diaSemanaInicio = 6;
+
+    const totalDiasMes = ultimoDia.getDate();
+    const hoyStr = new Date().toISOString().slice(0, 10);
+
+    const eventosPorFecha = {};
+    for (const lic of items) {
+      if (!lic.fechaCierre) continue;
+      const fStr = new Date(lic.fechaCierre).toISOString().slice(0, 10);
+      if (!eventosPorFecha[fStr]) eventosPorFecha[fStr] = [];
+      eventosPorFecha[fStr].push(lic);
+    }
+
+    setText('results-count', `Calendario de ${mesesNombres[mes]} ${año} · ${items.length} licitación(es) activa(s)`);
+
+    let cHtml = `
+      <div class="cal-container">
+        <header class="cal-header">
+          <div class="cal-title-wrap">
+            <h2 class="cal-title">${mesesNombres[mes]} ${año}</h2>
+            <div style="display:flex; gap:0.4rem;">
+              <button type="button" class="btn btn-secondary btn-sm" id="cal-prev">‹ Anterior</button>
+              <button type="button" class="btn btn-secondary btn-sm" id="cal-today">Hoy</button>
+              <button type="button" class="btn btn-secondary btn-sm" id="cal-next">Siguiente ›</button>
+            </div>
+          </div>
+          <div class="cal-legend">
+            <span class="cal-legend-item"><span class="cal-legend-dot" style="background:#ef4444"></span> 🚨 Cierra hoy / <24h</span>
+            <span class="cal-legend-item"><span class="cal-legend-dot" style="background:#f97316"></span> ⚠️ Cierra en <2d</span>
+            <span class="cal-legend-item"><span class="cal-legend-dot" style="background:#0284c7"></span> 📅 Plazo vigente</span>
+          </div>
+        </header>
+
+        <div class="cal-days-header">
+          <div>Lun</div><div>Mar</div><div>Mié</div><div>Jue</div><div>Vie</div><div>Sáb</div><div>Dom</div>
+        </div>
+
+        <div class="cal-grid">
+    `;
+
+    const prevMesUltimoDia = new Date(año, mes, 0).getDate();
+    for (let i = diaSemanaInicio - 1; i >= 0; i--) {
+      const dNum = prevMesUltimoDia - i;
+      cHtml += `<div class="cal-day other-month"><div class="cal-day-num">${dNum}</div></div>`;
+    }
+
+    for (let d = 1; d <= totalDiasMes; d++) {
+      const fechaObj = new Date(año, mes, d);
+      const offsetMs = fechaObj.getTimezoneOffset() * 60000;
+      const fechaIso = new Date(fechaObj.getTime() - offsetMs).toISOString().slice(0, 10);
+
+      const esHoy = fechaIso === hoyStr;
+      const licsDia = eventosPorFecha[fechaIso] || [];
+
+      cHtml += `<div class="cal-day ${esHoy ? 'today' : ''}">`;
+      cHtml += `<div class="cal-day-num"><span>${d}</span> ${licsDia.length ? `<span class="chip btn-sm" style="font-size:0.65rem;padding:1px 4px">${licsDia.length}</span>` : ''}</div>`;
+
+      for (const lic of licsDia) {
+        const info = obtenerInfoCierre(lic.fechaCierre);
+        let colorClass = 'blue';
+        if (info.clase.includes('deadline-red')) colorClass = 'red';
+        else if (info.clase.includes('deadline-orange')) colorClass = 'orange';
+
+        const hora = new Date(lic.fechaCierre).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+
+        cHtml += `
+          <div class="cal-event-chip ${colorClass}" data-cod="${esc(lic.codigoExterno)}" title="${esc(lic.nombre)} (${esc(lic.nombreOrganismo)})">
+            <b>${hora}</b> ${esc(lic.codigoExterno)}
+          </div>
+        `;
+      }
+
+      cHtml += `</div>`;
+    }
+
+    const totalCeldasActuales = diaSemanaInicio + totalDiasMes;
+    const celdasFaltantes = (7 - (totalCeldasActuales % 7)) % 7;
+    for (let i = 1; i <= celdasFaltantes; i++) {
+      cHtml += `<div class="cal-day other-month"><div class="cal-day-num">${i}</div></div>`;
+    }
+
+    cHtml += `</div></div>`;
+
+    host.innerHTML = cHtml;
+
+    document.getElementById('cal-prev')?.addEventListener('click', () => {
+      calFechaActual.setMonth(calFechaActual.getMonth() - 1);
+      cargarCalendario();
+    });
+    document.getElementById('cal-next')?.addEventListener('click', () => {
+      calFechaActual.setMonth(calFechaActual.getMonth() + 1);
+      cargarCalendario();
+    });
+    document.getElementById('cal-today')?.addEventListener('click', () => {
+      calFechaActual = new Date();
+      cargarCalendario();
+    });
+
+    host.querySelectorAll('.cal-event-chip').forEach((chip) => {
+      chip.addEventListener('click', (e) => {
+        e.stopPropagation();
+        abrirDetalle(chip.dataset.cod);
+      });
+    });
+
+  } catch (e) {
+    host.innerHTML = stateBox('Error al cargar calendario', esc(e.error || e.message));
   }
 }
 

@@ -41,6 +41,7 @@ app.get(
     '/favoritas',
     '/descartadas',
     '/historial',
+    '/calendario',
     '/dashboard',
     '/configuracion',
   ],

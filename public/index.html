@@ -63,8 +63,12 @@
       </div>
 
       <div class="sidebar-section">
-        <div class="sidebar-label">Auditoría</div>
+        <div class="sidebar-label">Auditoría & Agenda</div>
         <nav class="side-nav">
+          <button type="button" class="side-item" data-view="calendario" title="Calendario de Cierres">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <span>Calendario</span>
+          </button>
           <button type="button" class="side-item" data-view="descartadas" title="Descartadas">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg>
             <span>Descartadas</span>
@@ -200,6 +204,7 @@
 
         <div class="lic-list" id="lista"></div>
         <div id="historial-host" hidden></div>
+        <div id="calendario-host" hidden></div>
 
         <div class="pagination" id="pagination" hidden>
           <button type="button" class="btn btn-secondary btn-sm" id="btn-page-prev">Anterior</button>
@@ -220,8 +225,10 @@
       </button>
     </div>
     <div class="drawer-body" id="drawer-body"></div>
-    <div class="drawer-foot" id="drawer-foot">
-      <a class="btn btn-primary" id="drawer-link" href="#" target="_blank" rel="noopener" style="flex:1">Ver en Mercado Público</a>
+    <div class="drawer-foot" id="drawer-foot" style="flex-wrap:wrap; gap:0.5rem;">
+      <a class="btn btn-primary" id="drawer-link" href="#" target="_blank" rel="noopener" style="flex:1 1 100%">Ver en Mercado Público</a>
+      <a class="btn btn-secondary" id="drawer-gcal" href="#" target="_blank" rel="noopener" style="flex:1">📅 Google Calendar</a>
+      <button type="button" class="btn btn-secondary" id="drawer-ical" style="flex:1">📥 iCal (.ics)</button>
       <button type="button" class="btn btn-secondary" id="drawer-fav">Favorito</button>
       <button type="button" class="btn btn-secondary" id="drawer-descartar" style="color:var(--danger)">Descartar</button>
     </div>
