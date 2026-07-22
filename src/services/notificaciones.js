@@ -1,15 +1,25 @@
 'use strict';
 
 const { config } = require('../config');
+const { enviarEmailLicitaciones } = require('./email');
 
 /**
  * Envía notificación cuando hay licitaciones nuevas.
+ * - Email directo vía Amazon SES / SMTP (si está activado en .env)
  * - Webhook HTTP (Discord / Slack / Make / n8n / Zapier)
  * - El frontend también usa la Notification API del navegador
  */
 async function notificarNuevas(licitaciones, meta = {}) {
   if (!licitaciones || !licitaciones.length) {
     return { enviada: false, razon: 'sin_nuevas' };
+  }
+
+  // Intentar envío por email (Amazon SES)
+  let emailRes = { enviada: false };
+  try {
+    emailRes = await enviarEmailLicitaciones(licitaciones, meta);
+  } catch (e) {
+    console.warn('[notificaciones] error email:', e.message);
   }
 
   const resumen = licitaciones.slice(0, 10).map((l) => ({
@@ -34,7 +44,7 @@ async function notificarNuevas(licitaciones, meta = {}) {
   };
 
   if (!config.notifyWebhook) {
-    return { enviada: false, razon: 'sin_webhook', payload };
+    return { enviada: emailRes.enviada, razon: emailRes.enviada ? 'email' : 'sin_webhook', payload, email: emailRes };
   }
 
   try {
@@ -46,12 +56,12 @@ async function notificarNuevas(licitaciones, meta = {}) {
     if (!resp.ok) {
       const t = await resp.text().catch(() => '');
       console.warn('[notificaciones] webhook HTTP', resp.status, t.slice(0, 200));
-      return { enviada: false, razon: `http_${resp.status}` };
+      return { enviada: emailRes.enviada || false, razon: `http_${resp.status}`, email: emailRes };
     }
-    return { enviada: true, razon: 'webhook' };
+    return { enviada: true, razon: 'webhook_y_email', email: emailRes };
   } catch (e) {
     console.warn('[notificaciones] error webhook:', e.message);
-    return { enviada: false, razon: e.message };
+    return { enviada: emailRes.enviada || false, razon: e.message, email: emailRes };
   }
 }
 
@@ -74,8 +84,17 @@ function payloadDiscord(licitaciones) {
 }
 
 async function notificarDiscordCompatible(licitaciones, meta = {}) {
+  // Siempre procesa el correo por Amazon SES si está habilitado
+  let emailRes = { enviada: false };
+  try {
+    emailRes = await enviarEmailLicitaciones(licitaciones, meta);
+  } catch (e) {
+    console.warn('[notificaciones] error email:', e.message);
+  }
+
   if (!config.notifyWebhook || !licitaciones?.length) {
-    return notificarNuevas(licitaciones, meta);
+    const r = await notificarNuevas(licitaciones, meta);
+    return { ...r, email: emailRes };
   }
 
   // Si el webhook parece de Discord, usa formato nativo
@@ -89,9 +108,9 @@ async function notificarDiscordCompatible(licitaciones, meta = {}) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
-    return { enviada: resp.ok, razon: resp.ok ? 'discord' : `http_${resp.status}` };
+    return { enviada: resp.ok || emailRes.enviada, razon: resp.ok ? 'discord' : `http_${resp.status}`, email: emailRes };
   } catch (e) {
-    return { enviada: false, razon: e.message };
+    return { enviada: emailRes.enviada, razon: e.message, email: emailRes };
   }
 }
 

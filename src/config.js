@@ -6,7 +6,7 @@ const config = {
   // Mercado Público (ChileCompra)
   ticket: process.env.MERCADOPUBLICO_TICKET || '',
   apiBase: 'https://api.mercadopublico.cl/servicios/v1/publico/licitaciones.json',
-  fichaUrl: 'https://www.mercadopublico.cl/Procurement/Modules/RFB/DetailsStep.aspx?qs=',
+  fichaUrl: 'https://www.mercadopublico.cl/FichaLicitacion/detalle.aspx?idLicitacion=',
 
   // Servidor local
   port: parseInt(process.env.PORT || '3000', 10),
@@ -30,11 +30,19 @@ const config = {
   // Seguridad del cron (Vercel)
   cronSecret: process.env.CRON_SECRET || '',
 
-  // Notificaciones
-  // Webhook (Discord / Slack / Make / n8n) — POST JSON cuando hay nuevas
+  // Notificaciones Webhook (Discord / Slack / Make / n8n)
   notifyWebhook: process.env.NOTIFY_WEBHOOK_URL || '',
-  // Email de destino (se incluye en el payload del webhook; el envío real lo hace el webhook)
   notifyEmail: process.env.NOTIFY_EMAIL || '',
+
+  // Notificaciones Email Directo (Amazon SES / SMTP)
+  emailEnable: process.env.EMAIL_ENABLE === '1' || process.env.NOTIFY_EMAIL_ENABLE === '1',
+  smtpHost: process.env.SMTP_HOST || '',
+  smtpPort: parseInt(process.env.SMTP_PORT || '587', 10),
+  smtpUser: process.env.SMTP_USER || '',
+  smtpPass: process.env.SMTP_PASS || '',
+  smtpSecure: process.env.SMTP_SECURE === '1' || process.env.SMTP_SECURE === 'true',
+  emailFrom: process.env.EMAIL_FROM || '',
+  emailTo: process.env.EMAIL_TO || process.env.NOTIFY_EMAIL || '',
 };
 
 function ticketOk() {
