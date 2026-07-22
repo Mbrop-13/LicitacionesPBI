@@ -116,7 +116,7 @@ async function ejecutarBusqueda(opts = {}) {
 
       // Solo pedir detalle si hay indicios (más rápido y menos 429)
       const nombresTecnicos =
-        /capaci|formaci|curso|taller|entren|excel|power\s*bi|powerbi|sql\s*server|tsql|transact|python|machine|deep\s*learning|inteligencia\s*artificial|business\s*intelligence|inteligencia\s*de\s*negocios|big\s*data|power\s*automate|power\s*apps|power\s*platform|data\s*warehouse|data\s*lake|analisis\s*de\s*datos|analitica\s*de\s*datos|e-?learning|certificacion/i.test(
+        /capaci|formaci|curso|taller|entren|excel|power\s*bi|powerbi|\bsql\b|sql\s*server|tsql|transact|python|machine|deep\s*learning|\bia\b|inteligencia\s*artificial|business\s*intelligence|inteligencia\s*de\s*negocios|big\s*data|power\s*automate|power\s*apps|power\s*platform|data\s*warehouse|data\s*lake|analisis\s*de\s*datos|analitica\s*de\s*datos|e-?learning|certificacion|\bdax\b|\brpa\b|\bkpi\b|\bllm\b|chatgpt|copilot/i.test(
           lic.nombre || ''
         );
       const necesitaDetalle =

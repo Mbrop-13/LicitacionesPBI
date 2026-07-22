@@ -329,12 +329,7 @@ function setConn(ok, text) {
 async function cargarStats() {
   try {
     const s = await api('/api/stats');
-    setText('kpi-total', s.total);
-    setText('kpi-nuevas', s.noVistos);
-    setText('kpi-proc', s.vistos ?? 0);
-    setText('kpi-fav', s.favoritos);
-    setText('kpi-desc', s.descartadas ?? 0);
-    setText('kpi-ult', s.ultimoLog ? formatearFechaCorta(s.ultimoLog.fecha) : 'Sin escaneos');
+    // KPIs eliminados del header (redundantes con el sidebar). Solo sidebar.
     setText('nav-pendientes', s.noVistos);
     setText('nav-todas', s.total);
     setText('nav-procesadas', s.vistos ?? 0);

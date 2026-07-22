@@ -14,32 +14,38 @@ function normalizar(texto) {
     .trim();
 }
 
-/**
- * Toda keyword debe coincidir como palabra/frase completa (word boundaries),
- * nunca como subcadena. Evita falsos positivos como "excel" en "excelencia",
- * "bi" en "biblioteca", "sql" en "mosquitero", "kpi" en "explicito", etc.
- */
-function contieneKeyword(textoNorm, keywordNorm) {
-  if (!keywordNorm) return false;
-  const re = new RegExp(`(?:^|[^\\w])${escapeRegex(keywordNorm)}(?:[^\\w]|$)`, 'i');
-  return re.test(textoNorm);
-}
-
+/** Escapa caracteres especiales de expresiones regulares. */
 function escapeRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 /**
+ * Coincidencia flexible de keywords como palabra o frase completa (word boundaries).
+ * Permite que espacios, guiones, guiones bajos y puntos dentro de la keyword o texto
+ * coincidan de forma equivalente (ej: "power-bi" coincide con "power bi").
+ * Evita falsos positivos como "excel" en "excelencia", "bi" en "biblioteca",
+ * "sql" en "mysql", "ia" en "secretaria", "kpi" en "explicito", etc.
+ */
+function contieneKeyword(textoNorm, keywordNorm) {
+  if (!keywordNorm) return false;
+  const escaped = escapeRegex(keywordNorm);
+  const flex = escaped.replace(/(?:\\ |\s|-|\\\.|_)+/g, '[\\s\\-_.]+');
+  const re = new RegExp(`(?:^|[^\\w])${flex}(?:[^\\w]|$)`, 'i');
+  return re.test(textoNorm);
+}
+
+/**
  * Evalúa una licitación contra el perfil de ProgramBI.
  * @param {object} licitacion  normalizada
- * @param {object|null} perfil { umbral, cursos[] }
+ * @param {object|null} perfil { umbral, requireTecnico, cursos[] }
  */
 function evaluar(licitacion, perfil) {
+  const lic = licitacion || {};
   const cfg = perfil || KEYWORDS_DEFAULT;
   const umbral = typeof cfg.umbral === 'number' ? cfg.umbral : 1;
 
   const texto = normalizar(
-    `${licitacion.nombre || ''} ${licitacion.descripcion || ''} ${licitacion.tipo || ''}`
+    `${lic.nombre || ''} ${lic.descripcion || ''} ${lic.tipo || ''}`
   );
 
   const cursosDetectados = [];
@@ -53,18 +59,19 @@ function evaluar(licitacion, perfil) {
       if (!k) continue;
       if (contieneKeyword(texto, k)) coincidencias.push(kw);
     }
-    if (coincidencias.length > 0) {
+    const coincidenciasUnicas = [...new Set(coincidencias)];
+    if (coincidenciasUnicas.length > 0) {
       cursosDetectados.push({
         id: curso.id,
         nombre: curso.nombre,
-        coincidencias: [...new Set(coincidencias)],
+        coincidencias: coincidenciasUnicas,
       });
-      scoreTotal += coincidencias.length;
-      if (curso.id !== 'formacion') scoreTecnico += coincidencias.length;
+      scoreTotal += coincidenciasUnicas.length;
+      if (curso.id !== 'formacion') scoreTecnico += coincidenciasUnicas.length;
     }
   }
 
-  // Por defecto: hace falta al menos 1 keyword técnica (Excel, Power BI, etc.).
+  // Por defecto: hace falta al menos 1 keyword técnica (Excel, Power BI, SQL, IA, etc.).
   // "Capacitación" sola genera demasiado ruido (primeros auxilios, seguridad, etc.).
   // Si umbral > 1, también se exige scoreTotal >= umbral.
   const requireTecnico = cfg.requireTecnico !== false;

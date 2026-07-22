@@ -568,40 +568,7 @@ button { cursor: pointer; border: none; background: none; }
   place-items: center;
 }
 
-/* ─── KPI strip ─── */
-.kpi-strip {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-}
-.kpi-mini {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 0.65rem 0.85rem;
-  min-width: 88px;
-  box-shadow: var(--shadow-sm);
-}
-.kpi-mini.wide { min-width: 140px; flex: 1; }
-.kpi-mini-val {
-  display: block;
-  font-size: 1.25rem;
-  font-weight: 600;
-  letter-spacing: -0.03em;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.1;
-}
-.kpi-mini-val.sm { font-size: 0.85rem; letter-spacing: -0.015em; margin-top: 0.15rem; }
-.kpi-mini-lbl {
-  display: block;
-  margin-top: 0.2rem;
-  font-size: 0.68rem;
-  font-weight: 500;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
+/* ─── KPI strip eliminado: contadores redundantes con la sidebar ─── */
 
 /* ─── Filters ─── */
 .filters {
