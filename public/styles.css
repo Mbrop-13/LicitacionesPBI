@@ -2,6 +2,10 @@
    ProgramBI · Licitaciones — Grok-like shell + sidebar
    ═══════════════════════════════════════════════════════════ */
 
+[hidden] {
+  display: none !important;
+}
+
 :root {
   --bg: #f4f4f5;
   --bg-elevated: #fafafa;

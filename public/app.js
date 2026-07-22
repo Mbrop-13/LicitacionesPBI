@@ -43,7 +43,8 @@ document.addEventListener('DOMContentLoaded', () => {
   wire();
   initSidebarState();
   initTopbarScroll();
-  setView(view, false);
+  view = getInitialView();
+  setView(view, false, false);
   // Si el servidor tenía un job colgado, lo mata (no inicia búsqueda nueva)
   liberarServidorAlCargar();
   comprobarStatus();
@@ -236,37 +237,93 @@ function initTopbarScroll() {
   );
 }
 
-/* ── Views ── */
-function setView(name, load = true) {
+/* ── Views y Enrutamiento ── */
+function getInitialView() {
+  const path = window.location.pathname.replace(/^\/+/, '').split('/')[0];
+  if (path && VIEWS[path]) return path;
+  const hash = window.location.hash.replace(/^#\/?/, '');
+  if (hash && VIEWS[hash]) return hash;
+  return 'inicio';
+}
+
+function setView(name, load = true, updateHistory = true) {
+  if (!VIEWS[name]) name = 'inicio';
   view = name;
   page = 1;
   document.querySelectorAll('.side-item[data-view]').forEach((b) => {
     b.classList.toggle('active', b.dataset.view === name);
   });
-  const meta = VIEWS[name] || VIEWS.todas;
+  const meta = VIEWS[name] || VIEWS.inicio;
   setText('view-title', meta.title);
   setText('view-sub', meta.sub);
 
   const isInicio = name === 'inicio';
   const isDesc = name === 'descartadas';
   const isHist = name === 'historial';
-  document.getElementById('dashboard-host').hidden = !isInicio;
-  document.getElementById('filters-oportunidades').hidden = isDesc || isHist || isInicio;
-  document.getElementById('filters-descartadas').hidden = !isDesc;
-  document.getElementById('lista').hidden = isHist || isInicio;
-  document.getElementById('historial-host').hidden = !isHist;
-  document.getElementById('btn-csv').hidden = isHist;
-  document.getElementById('btn-mark-all').hidden = isDesc || isHist;
-  document.getElementById('pagination').hidden = isHist || isInicio;
+
+  const dashHost = document.getElementById('dashboard-host');
+  const filtersOp = document.getElementById('filters-oportunidades');
+  const filtersDesc = document.getElementById('filters-descartadas');
+  const lista = document.getElementById('lista');
+  const histHost = document.getElementById('historial-host');
+  const btnCsv = document.getElementById('btn-csv');
+  const btnMarkAll = document.getElementById('btn-mark-all');
+  const pagination = document.getElementById('pagination');
+
+  if (dashHost) {
+    dashHost.hidden = !isInicio;
+    dashHost.style.display = isInicio ? 'flex' : 'none';
+  }
+  if (filtersOp) {
+    filtersOp.hidden = isDesc || isHist || isInicio;
+    filtersOp.style.display = (isDesc || isHist || isInicio) ? 'none' : 'flex';
+  }
+  if (filtersDesc) {
+    filtersDesc.hidden = !isDesc;
+    filtersDesc.style.display = isDesc ? 'flex' : 'none';
+  }
+  if (lista) {
+    lista.hidden = isHist || isInicio;
+    lista.style.display = (isHist || isInicio) ? 'none' : 'grid';
+  }
+  if (histHost) {
+    histHost.hidden = !isHist;
+    histHost.style.display = isHist ? 'block' : 'none';
+  }
+  if (btnCsv) {
+    btnCsv.hidden = isHist;
+    btnCsv.style.display = isHist ? 'none' : 'inline-flex';
+  }
+  if (btnMarkAll) {
+    btnMarkAll.hidden = isDesc || isHist || isInicio;
+    btnMarkAll.style.display = (isDesc || isHist || isInicio) ? 'none' : 'inline-flex';
+  }
+  if (pagination) {
+    pagination.hidden = isHist || isInicio;
+    pagination.style.display = (isHist || isInicio) ? 'none' : 'flex';
+  }
+
+  if (updateHistory) {
+    const newPath = name === 'inicio' ? '/' : `/${name}`;
+    if (window.location.pathname !== newPath) {
+      history.pushState({ view: name }, '', newPath);
+    }
+  }
 
   closeSidebarMobile();
   if (load) cargarVista();
 }
 
+window.addEventListener('popstate', (e) => {
+  const targetView = e.state?.view || getInitialView();
+  setView(targetView, true, false);
+});
+
 async function cargarVista() {
   if (view === 'inicio') return cargarDashboard();
   if (view === 'historial') {
-    document.getElementById('pagination').hidden = true;
+    const p = document.getElementById('pagination');
+    if (p) { p.hidden = true; p.style.display = 'none'; }
     return cargarHistorial();
   }
   if (view === 'descartadas') return cargarDescartadas();

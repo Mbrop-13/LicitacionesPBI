@@ -31,10 +31,24 @@ try {
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // SPA-friendly fallbacks
-app.get(['/dashboard', '/configuracion'], (_req, res) => {
-  const file = _req.path.includes('config') ? 'config.html' : 'index.html';
-  res.sendFile(path.join(__dirname, '..', 'public', file));
-});
+app.get(
+  [
+    '/',
+    '/inicio',
+    '/pendientes',
+    '/todas',
+    '/procesadas',
+    '/favoritas',
+    '/descartadas',
+    '/historial',
+    '/dashboard',
+    '/configuracion',
+  ],
+  (_req, res) => {
+    const file = _req.path.includes('config') ? 'config.html' : 'index.html';
+    res.sendFile(path.join(__dirname, '..', 'public', file));
+  }
+);
 
 const PORT = config.port;
 app.listen(PORT, () => {
