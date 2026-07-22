@@ -10,6 +10,7 @@ const api = (url, opts) =>
 const PAGE_SIZE = 50;
 
 const VIEWS = {
+  inicio: { title: 'Inicio', sub: 'Resumen del sistema y métricas clave' },
   pendientes: { title: 'Sin revisar', sub: 'Oportunidades pendientes de lectura' },
   todas: { title: 'Encontradas', sub: 'Licitaciones que coinciden con el perfil ProgramBI' },
   procesadas: { title: 'Procesadas', sub: 'Ya revisadas' },
@@ -24,7 +25,7 @@ const VIEWS = {
   },
 };
 
-let view = 'pendientes';
+let view = 'inicio';
 let page = 1;
 let totalPages = 1;
 let totalItems = 0;
@@ -246,21 +247,24 @@ function setView(name, load = true) {
   setText('view-title', meta.title);
   setText('view-sub', meta.sub);
 
+  const isInicio = name === 'inicio';
   const isDesc = name === 'descartadas';
   const isHist = name === 'historial';
-  document.getElementById('filters-oportunidades').hidden = isDesc || isHist;
+  document.getElementById('dashboard-host').hidden = !isInicio;
+  document.getElementById('filters-oportunidades').hidden = isDesc || isHist || isInicio;
   document.getElementById('filters-descartadas').hidden = !isDesc;
-  document.getElementById('lista').hidden = isHist;
+  document.getElementById('lista').hidden = isHist || isInicio;
   document.getElementById('historial-host').hidden = !isHist;
   document.getElementById('btn-csv').hidden = isHist;
   document.getElementById('btn-mark-all').hidden = isDesc || isHist;
-  document.getElementById('pagination').hidden = isHist;
+  document.getElementById('pagination').hidden = isHist || isInicio;
 
   closeSidebarMobile();
   if (load) cargarVista();
 }
 
 async function cargarVista() {
+  if (view === 'inicio') return cargarDashboard();
   if (view === 'historial') {
     document.getElementById('pagination').hidden = true;
     return cargarHistorial();
@@ -274,6 +278,241 @@ function setNavCount(viewName, n) {
   if (!el) return;
   if (n > 0) el.setAttribute('data-count', n > 99 ? '99+' : String(n));
   else el.removeAttribute('data-count');
+}
+
+/* ── Dashboard (página de inicio) ── */
+async function cargarDashboard() {
+  const host = document.getElementById('dashboard-host');
+  host.hidden = false;
+  host.innerHTML = skeletonCards(3);
+  setText('results-count', 'Cargando…');
+  try {
+    const d = await api('/api/dashboard');
+    renderDashboard(d);
+    setText('results-count', `Actualizado ${formatearFechaCorta(d.generadoEn)}`);
+  } catch (e) {
+    host.innerHTML = stateBox('Error', esc(e.error || e.message || 'No se pudo cargar el dashboard'));
+    setText('results-count', 'Error');
+  }
+}
+
+function renderDashboard(d) {
+  const host = document.getElementById('dashboard-host');
+  const t = d.totales || {};
+  const motivoLabels = {
+    sin_coincidencia: 'Sin coincidencia',
+    solo_formacion: 'Solo formación',
+    bajo_umbral: 'Bajo umbral',
+    no_aplica: 'No aplica',
+  };
+  const motivoTotal = Object.values(d.porMotivo || {}).reduce((a, b) => a + b, 0) || 1;
+  const motivos = Object.entries(d.porMotivo || {})
+    .map(([k, n]) => ({ k, n, label: motivoLabels[k] || k, pct: Math.round((n / motivoTotal) * 100) }))
+    .sort((a, b) => b.n - a.n);
+  const ult = d.ultimasEncontradas || [];
+  const topCursos = d.topCursos || [];
+  const topOrg = d.topOrganismos || [];
+  const v = d.ventanas || {};
+  const ultLog = d.ultimoLog;
+  const ultLogTxt = ultLog
+    ? `${formatearFechaCorta(ultLog.fecha)} · API ${ultLog.licitaciones_api ?? 0} · ${ultLog.licitaciones_nuevas ?? 0} nuevas`
+    : 'Sin escaneos aún';
+
+  host.innerHTML = `
+    <section class="dash-hero">
+      <div>
+        <h2 class="dash-h2">Hola, esto es ProgramBI</h2>
+        <p class="dash-sub">Buscador inteligente de licitaciones de Mercado Público para cursos de Excel, Power BI, SQL, IA y más.</p>
+      </div>
+      <div class="dash-hero-meta">
+        <span class="dot ${d.storage === 'supabase' ? 'ok' : 'idle'}"></span>
+        ${d.storage === 'supabase' ? 'Supabase' : 'Local'} · último escaneo ${esc(ultLogTxt)}
+      </div>
+    </section>
+
+    <section class="dash-windows">
+      ${ventanaCard('Hoy', v.hoy)}
+      ${ventanaCard('Esta semana', v.semana)}
+      ${ventanaCard('Este mes', v.mes)}
+    </section>
+
+    <section class="dash-grid">
+      <article class="dash-card">
+        <header class="dash-card-head">
+          <h3>Totales</h3>
+          <span class="dash-card-sub">acumulado</span>
+        </header>
+        <ul class="dash-totales">
+          <li><b>${t.total || 0}</b><span>Encontradas</span></li>
+          <li><b>${t.noVistos || 0}</b><span>Sin revisar</span></li>
+          <li><b>${t.vistos || 0}</b><span>Procesadas</span></li>
+          <li><b>${t.favoritos || 0}</b><span>Favoritas</span></li>
+          <li><b>${t.descartadas || 0}</b><span>Descartadas</span></li>
+        </ul>
+        ${(t.conDescripcion != null && (t.conDescripcion + t.sinDescripcion) > 0) ? `
+          <div class="dash-progress-wrap">
+            <div class="dash-progress-head">
+              <span>Descripciones completas</span>
+              <span>${t.conDescripcion}/${t.conDescripcion + t.sinDescripcion}</span>
+            </div>
+            <div class="dash-progress"><i style="width:${Math.round((t.conDescripcion / (t.conDescripcion + t.sinDescripcion)) * 100)}%"></i></div>
+            ${t.sinDescripcion > 0 ? `<button type="button" class="btn btn-secondary btn-sm" id="btn-reenriquecer">Re-enriquecer ${t.sinDescripcion} sin descripción</button>` : ''}
+          </div>
+        ` : ''}
+      </article>
+
+      <article class="dash-card">
+        <header class="dash-card-head">
+          <h3>Top cursos detectados</h3>
+          <span class="dash-card-sub">encontradas</span>
+        </header>
+        ${topCursos.length ? `
+          <ul class="dash-bars">
+            ${topCursos
+              .map(
+                (c) => `
+              <li>
+                <span class="dash-bar-lbl">${esc(c.nombre)}</span>
+                <span class="dash-bar-track"><i style="width:${pct(c.n, topCursos[0].n)}%"></i></span>
+                <span class="dash-bar-n">${c.n}</span>
+              </li>`
+              )
+              .join('')}
+          </ul>
+        ` : '<p class="dash-empty">Sin datos aún — ejecuta <b>Buscar ahora</b>.</p>'}
+      </article>
+
+      <article class="dash-card">
+        <header class="dash-card-head">
+          <h3>Motivos de descarte</h3>
+          <span class="dash-card-sub">auditoría</span>
+        </header>
+        ${motivos.length ? `
+          <ul class="dash-bars">
+            ${motivos
+              .map(
+                (m) => `
+              <li>
+                <span class="dash-bar-lbl">${esc(m.label)}</span>
+                <span class="dash-bar-track warn"><i style="width:${m.pct}%"></i></span>
+                <span class="dash-bar-n">${m.n}</span>
+              </li>`
+              )
+              .join('')}
+          </ul>
+        ` : '<p class="dash-empty">Sin descartes.</p>'}
+      </article>
+
+      ${topOrg.length ? `
+        <article class="dash-card">
+          <header class="dash-card-head">
+            <h3>Top organismos</h3>
+            <span class="dash-card-sub">quienes más publican</span>
+          </header>
+          <ul class="dash-bars">
+            ${topOrg
+              .map(
+                (o) => `
+              <li>
+                <span class="dash-bar-lbl" title="${esc(o.nombre)}">${esc(corta(o.nombre, 38))}</span>
+                <span class="dash-bar-track"><i style="width:${pct(o.n, topOrg[0].n)}%"></i></span>
+                <span class="dash-bar-n">${o.n}</span>
+              </li>`
+              )
+              .join('')}
+          </ul>
+        </article>
+      ` : ''}
+    </section>
+
+    <section class="dash-card dash-ultimas">
+      <header class="dash-card-head">
+        <h3>Últimas encontradas</h3>
+        <a href="#" id="dash-ver-todas" class="dash-link">Ver todas →</a>
+      </header>
+      ${ult.length ? `
+        <ul class="dash-ult-list">
+          ${ult
+            .map(
+              (l) => `
+            <li>
+              <a class="dash-ult-link" data-cod="${esc(l.codigoExterno)}" href="#">
+                <span class="dash-ult-nombre">${esc(l.nombre || '(sin nombre)')}</span>
+                <span class="dash-ult-meta">${esc(l.nombreOrganismo || '—')}</span>
+                <span class="dash-ult-cursos">${(l.cursos || [])
+                  .slice(0, 3)
+                  .map((c) => `<span class="chip">${esc(c.nombre)}</span>`)
+                  .join('')}</span>
+                <span class="dash-ult-aff">${l.afinidad || 0}%</span>
+              </a>
+            </li>`
+            )
+            .join('')}
+        </ul>
+      ` : '<p class="dash-empty">Sin encontradas todavía. Pulsa <b>Buscar ahora</b> en la barra superior.</p>'}
+    </section>
+  `;
+
+  document.getElementById('btn-reenriquecer')?.addEventListener('click', reEnriquecerAhora);
+  document.getElementById('dash-ver-todas')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    setView('todas');
+  });
+  host.querySelectorAll('.dash-ult-link').forEach((a) => {
+    a.addEventListener('click', (e) => {
+      e.preventDefault();
+      abrirDetalle(a.dataset.cod);
+    });
+  });
+}
+
+function ventanaCard(label, v) {
+  v = v || {};
+  return `
+    <article class="dash-ventana">
+      <div class="dash-ventana-h">${label}</div>
+      <div class="dash-ventana-grid">
+        <div><b>${v.encontradas || 0}</b><span>encontradas</span></div>
+        <div><b class="hi">${v.nuevas || 0}</b><span>nuevas</span></div>
+        <div><b class="warn">${v.descartadas || 0}</b><span>descartadas</span></div>
+        <div><b class="muted">${v.api || 0}</b><span>en API</span></div>
+      </div>
+    </article>`;
+}
+
+function pct(n, max) {
+  if (!max) return 0;
+  return Math.max(2, Math.round((n / max) * 100));
+}
+
+function corta(s, n) {
+  s = String(s || '');
+  return s.length > n ? s.slice(0, n - 1) + '…' : s;
+}
+
+async function reEnriquecerAhora() {
+  if (!confirm('Esto consultará la API de Mercado Público para traer las descripciones faltantes. Puede tardar varios minutos. ¿Continuar?')) return;
+  const btn = document.getElementById('btn-reenriquecer');
+  const prev = btn?.textContent;
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spin"></span> Enviando…';
+  }
+  try {
+    await api('/api/licitaciones/re-enriquecer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    toast('Re-enriquecimiento iniciado en segundo plano');
+    flash('info', 'Re-enriquecimiento en curso. Las descripciones se actualizan a medida que la API responde. Vuelve a <b>Inicio</b> en unos minutos.');
+  } catch (e) {
+    toast(e.error || e.message || 'Error', true);
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = prev || 'Re-enriquecer';
+    }
+  }
 }
 
 /* ── Status / ping ── */

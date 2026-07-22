@@ -157,6 +157,34 @@ app.get(`${BASE}/stats`, async (_req, res) => {
   }
 });
 
+// ── Dashboard (página de inicio) ──
+app.get(`${BASE}/dashboard`, async (_req, res) => {
+  try {
+    res.json(await store.dashboard());
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Re-enriquecer: trae descripciones faltantes desde la API ──
+app.post(`${BASE}/licitaciones/re-enriquecer`, async (req, res) => {
+  try {
+    if (!ticketOk()) {
+      return res.status(400).json({ error: 'Ticket de Mercado Público no configurado' });
+    }
+    const limite = parseInt(req.body?.limite ?? req.query?.limite ?? '0', 10) || Infinity;
+    // Respondemos de inmediato: el re-enriquecedor va en background
+    res.json({ ok: true, started: true, mensaje: 'Re-enriquecimiento iniciado en segundo plano' });
+    // Background: ejecutamos sin await sobre la response
+    store
+      .reEnriquecerSinDescripcion({ limite })
+      .then((r) => console.log(`[re-enriquecer] ${r.actualizadas}/${r.total} actualizadas`))
+      .catch((e) => console.error('[re-enriquecer] error:', e.message));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.get(`${BASE}/logs`, async (req, res) => {
   try {
     res.json(await store.listarLogs(parseInt(req.query.limite || '40', 10)));

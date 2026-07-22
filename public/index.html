@@ -30,6 +30,13 @@
       </div>
 
       <div class="sidebar-section">
+        <div class="sidebar-label">General</div>
+        <nav class="side-nav">
+          <button type="button" class="side-item" data-view="inicio" title="Inicio">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/></svg>
+            <span>Inicio</span>
+          </button>
+        </nav>
         <div class="sidebar-label">Bandeja</div>
         <nav class="side-nav">
           <button type="button" class="side-item active" data-view="pendientes" title="Sin revisar">
@@ -154,6 +161,8 @@
 
       <main class="content" id="content">
         <div class="alerts" id="alerta-host"></div>
+
+        <div class="dashboard-host" id="dashboard-host" hidden></div>
 
         <div class="filters" id="filters-oportunidades">
           <div class="search-wrap">

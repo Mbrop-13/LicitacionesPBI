@@ -633,6 +633,302 @@ async function countDescartadas() {
   return readJson(FILE_DESC, []).length;
 }
 
+// ───────────────── Dashboard ─────────────────
+
+/**
+ * Métricas agregadas para la página de inicio.
+ * - hoy / semana / mes: cuentas sobre logs de búsqueda (no licitaciones) para
+ *   reflejar lo que ENCONTRÓ el sistema, no el acumulado histórico.
+ * - totales: contadores de la base (licitaciones + descartadas).
+ * - topCursos / topOrganismos: distribución de las guardadas.
+ * - ultimasEncontradas: las 5 más recientes por afinidad/fecha.
+ * - porMotivo: distribución de descartadas.
+ */
+async function dashboard() {
+  if (useSupabase()) return dashboardSupabase();
+  return dashboardLocal();
+}
+
+function enRango(fecha, diasAtras) {
+  if (!fecha) return false;
+  const d = new Date(fecha);
+  if (isNaN(d)) return false;
+  const limite = new Date();
+  limite.setDate(limite.getDate() - diasAtras);
+  limite.setHours(0, 0, 0, 0);
+  return d >= limite;
+}
+
+function dashboardLocal() {
+  const all = readJson(FILE_LIC, []);
+  const logs = readJson(FILE_LOGS, []);
+  const desc = readJson(FILE_DESC, []);
+
+  // Acumular por ventana temporal usando los LOGS (lo que realmente buscó el sistema)
+  const ventanas = { hoy: 0, semana: 0, mes: 0 };
+  const apiVentanas = { hoy: 0, semana: 0, mes: 0 };
+  const descVentanas = { hoy: 0, semana: 0, mes: 0 };
+  const nuevasVentanas = { hoy: 0, semana: 0, mes: 0 };
+
+  for (const l of logs) {
+    const f = l.fecha;
+    if (enRango(f, 1)) {
+      apiVentanas.hoy += l.licitaciones_api || 0;
+      nuevasVentanas.hoy += l.licitaciones_nuevas || 0;
+      descVentanas.hoy += l.licitaciones_descartadas || 0;
+    }
+    if (enRango(f, 7)) {
+      apiVentanas.semana += l.licitaciones_api || 0;
+      nuevasVentanas.semana += l.licitaciones_nuevas || 0;
+      descVentanas.semana += l.licitaciones_descartadas || 0;
+    }
+    if (enRango(f, 30)) {
+      apiVentanas.mes += l.licitaciones_api || 0;
+      nuevasVentanas.mes += l.licitaciones_nuevas || 0;
+      descVentanas.mes += l.licitaciones_descartadas || 0;
+    }
+  }
+  // Encontradas por ventana: contar guardadas creadas en ese rango
+  for (const t of all) {
+    if (enRango(t.creadoEn, 1)) ventanas.hoy++;
+    if (enRango(t.creadoEn, 7)) ventanas.semana++;
+    if (enRango(t.creadoEn, 30)) ventanas.mes++;
+  }
+
+  // Top cursos (solo ids que están en la config por defecto, así sabemos el nombre)
+  const cfg = readJson(FILE_CFG, null);
+  const nombreCurso = new Map();
+  if (cfg && Array.isArray(cfg.cursos)) {
+    for (const c of cfg.cursos) nombreCurso.set(c.id, c.nombre);
+  } else if (KEYWORDS_DEFAULT && Array.isArray(KEYWORDS_DEFAULT.cursos)) {
+    for (const c of KEYWORDS_DEFAULT.cursos) nombreCurso.set(c.id, c.nombre);
+  }
+  const porCurso = {};
+  for (const t of all) {
+    for (const c of t.cursos || []) {
+      if (!c.id || c.id === 'formacion') continue; // capacitación sola no es curso 'real'
+      porCurso[c.id] = (porCurso[c.id] || 0) + 1;
+    }
+  }
+  const topCursos = Object.entries(porCurso)
+    .map(([id, n]) => ({ id, nombre: nombreCurso.get(id) || id, n }))
+    .sort((a, b) => b.n - a.n)
+    .slice(0, 8);
+
+  // Top organismos
+  const porOrg = {};
+  for (const t of all) {
+    const o = (t.nombreOrganismo || '').trim() || 'Sin organismo';
+    porOrg[o] = (porOrg[o] || 0) + 1;
+  }
+  const topOrganismos = Object.entries(porOrg)
+    .map(([nombre, n]) => ({ nombre, n }))
+    .sort((a, b) => b.n - a.n)
+    .slice(0, 5);
+
+  // Distribución de motivos de descarte
+  const porMotivo = {};
+  for (const d of desc) {
+    const m = d.motivo || 'otro';
+    porMotivo[m] = (porMotivo[m] || 0) + 1;
+  }
+
+  // Últimas encontradas (5 más recientes con campos básicos)
+  const ultimas = [...all]
+    .sort((a, b) =>
+      String(b.creadoEn || b.actualizadoEn || '').localeCompare(
+        String(a.creadoEn || a.actualizadoEn || '')
+      )
+    )
+    .slice(0, 5)
+    .map((t) => ({
+      codigoExterno: t.codigoExterno,
+      nombre: t.nombre,
+      nombreOrganismo: t.nombreOrganismo,
+      afinidad: t.afinidad || 0,
+      cursos: (t.cursos || []).map((c) => ({ id: c.id, nombre: c.nombre })),
+      urlFicha: t.urlFicha,
+      creadoEn: t.creadoEn,
+      visto: !!t.visto,
+    }));
+
+  return {
+    ventanas: {
+      hoy: { encontradas: ventanas.hoy, nuevas: nuevasVentanas.hoy, descartadas: descVentanas.hoy, api: apiVentanas.hoy },
+      semana: { encontradas: ventanas.semana, nuevas: nuevasVentanas.semana, descartadas: descVentanas.semana, api: apiVentanas.semana },
+      mes: { encontradas: ventanas.mes, nuevas: nuevasVentanas.mes, descartadas: descVentanas.mes, api: apiVentanas.mes },
+    },
+    totales: {
+      total: all.length,
+      noVistos: all.filter((x) => !x.visto).length,
+      vistos: all.filter((x) => x.visto).length,
+      favoritos: all.filter((x) => x.esFavorito).length,
+      descartadas: desc.length,
+      conDescripcion: all.filter((x) => (x.descripcion || '').length > 30).length,
+      sinDescripcion: all.filter((x) => !x.descripcion || (x.descripcion || '').length <= 30).length,
+    },
+    topCursos,
+    topOrganismos,
+    porMotivo,
+    ultimasEncontradas: ultimas,
+    ultimoLog: logs[0] || null,
+    storage: 'local',
+    generadoEn: new Date().toISOString(),
+  };
+}
+
+async function dashboardSupabase() {
+  const sb = getSupabase();
+  const now = new Date();
+  const inicio = (dias) => {
+    const f = new Date(now);
+    f.setDate(f.getDate() - dias);
+    f.setHours(0, 0, 0, 0);
+    return f.toISOString();
+  };
+
+  // Conteos por ventana
+  async function countVentana(dias) {
+    const iso = inicio(dias);
+    const { count: encontradas } = await sb
+      .from('licitaciones')
+      .select('*', { count: 'exact', head: true })
+      .gte('creado_en', iso);
+    return encontradas || 0;
+  }
+  const [eH, eS, eM] = await Promise.all([countVentana(1), countVentana(7), countVentana(30)]);
+
+  // Logs por ventana (api/nuevas/descartadas)
+  async function logsVentana(dias) {
+    const iso = inicio(dias);
+    const { data } = await sb
+      .from('log_busquedas')
+      .select('licitaciones_api, licitaciones_nuevas, licitaciones_descartadas')
+      .gte('fecha', iso);
+    let api = 0, nuevas = 0, desc = 0;
+    for (const l of data || []) {
+      api += l.licitaciones_api || 0;
+      nuevas += l.licitaciones_nuevas || 0;
+      desc += l.licitaciones_descartadas || 0;
+    }
+    return { api, nuevas, desc };
+  }
+  const [lH, lS, lM] = await Promise.all([logsVentana(1), logsVentana(7), logsVentana(30)]);
+
+  // Totales y porCurso/porOrganismo
+  const statsBase = await stats();
+
+  // Últimas 5 encontradas
+  const { data: ult } = await sb
+    .from('licitaciones')
+    .select('codigo_externo, nombre, nombre_organismo, afinidad, cursos, url_ficha, creado_en, visto')
+    .order('creado_en', { ascending: false })
+    .limit(5);
+  const ultimasEncontradas = (ult || []).map((t) => ({
+    codigoExterno: t.codigo_externo,
+    nombre: t.nombre,
+    nombreOrganismo: t.nombre_organismo,
+    afinidad: t.afinidad || 0,
+    cursos: safeJson(t.cursos, []).map((c) => ({ id: c.id, nombre: c.nombre })),
+    urlFicha: t.url_ficha,
+    creadoEn: t.creado_en,
+    visto: !!t.visto,
+  }));
+
+  return {
+    ventanas: {
+      hoy: { encontradas: eH, nuevas: lH.nuevas, descartadas: lH.desc, api: lH.api },
+      semana: { encontradas: eS, nuevas: lS.nuevas, descartadas: lS.desc, api: lS.api },
+      mes: { encontradas: eM, nuevas: lM.nuevas, descartadas: lM.desc, api: lM.api },
+    },
+    totales: {
+      ...statsBase,
+      conDescripcion: 0, // se calcula abajo
+      sinDescripcion: 0,
+    },
+    topCursos: statsBase.porCurso.filter((c) => c.curso_id !== 'formacion').slice(0, 8).map((c) => ({
+      id: c.curso_id, nombre: c.curso_nombre, n: c.n,
+    })),
+    topOrganismos: [], // TODO si se necesita
+    porMotivo: statsBase.porMotivoDescartes || {},
+    ultimasEncontradas,
+    ultimoLog: statsBase.ultimoLog,
+    storage: 'supabase',
+    generadoEn: new Date().toISOString(),
+  };
+}
+
+/**
+ * Re-enriquece las licitaciones guardadas que NO tienen descripción,
+ * pidiéndolas por código a la API. Devuelve cuántas se actualizaron.
+ */
+async function reEnriquecerSinDescripcion(opts = {}) {
+  const { fetcher, limite = Infinity, onProgress } = opts;
+  const fetchDetalle = fetcher || require('../services/mercadoPublico').detallePorCodigo;
+  if (useSupabase()) {
+    const sb = getSupabase();
+    const { data: filas } = await sb
+      .from('licitaciones')
+      .select('codigo_externo, descripcion')
+      .or('descripcion.is.null,descripcion.eq.""')
+      .limit(500);
+    if (!filas?.length) return { actualizadas: 0, total: 0 };
+    let actualizadas = 0;
+    for (const f of filas) {
+      if (actualizadas >= limite) break;
+      try {
+        const det = await fetchDetalle(f.codigo_externo);
+        if (!det) continue;
+        const norm = require('../services/mercadoPublico').normalizarLicitacion(det);
+        if (!norm.descripcion || norm.descripcion.length < 30) continue;
+        const { error } = await sb
+          .from('licitaciones')
+          .update({ descripcion: norm.descripcion, tipo: norm.tipo })
+          .eq('codigo_externo', f.codigo_externo);
+        if (!error) {
+          actualizadas++;
+          onProgress?.({ codigo: f.codigo_externo, restantes: filas.length - actualizadas });
+        }
+      } catch (e) {
+        console.warn('[store] reEnriquecer', f.codigo_externo, e.message);
+      }
+    }
+    return { actualizadas, total: filas.length };
+  }
+
+  const all = readJson(FILE_LIC, []);
+  const sinDesc = all.filter((x) => !x.descripcion || x.descripcion.length < 30);
+  if (!sinDesc.length) return { actualizadas: 0, total: 0 };
+  let actualizadas = 0;
+  for (const t of sinDesc) {
+    if (actualizadas >= limite) break;
+    try {
+      const det = await fetchDetalle(t.codigoExterno);
+      if (!det) continue;
+      const norm = require('../services/mercadoPublico').normalizarLicitacion(det);
+      if (!norm.descripcion || norm.descripcion.length < 30) continue;
+      t.descripcion = norm.descripcion;
+      if (norm.tipo) t.tipo = norm.tipo;
+      t.actualizadoEn = new Date().toISOString();
+      // Re-evaluar matcher para que las keywords se recalculen contra la descripción nueva
+      try {
+        const { evaluar } = require('../matcher/matcher');
+        const cfg = readJson(FILE_CFG, null) || KEYWORDS_DEFAULT;
+        const r = evaluar(t, cfg);
+        t.cursos = r.cursos;
+        t.score = r.score;
+        t.afinidad = r.afinidad;
+      } catch { /* ignore */ }
+      actualizadas++;
+      onProgress?.({ codigo: t.codigoExterno, restantes: sinDesc.length - actualizadas });
+    } catch (e) {
+      console.warn('[store] reEnriquecer', t.codigoExterno, e.message);
+    }
+  }
+  if (actualizadas) writeJson(FILE_LIC, all);
+  return { actualizadas, total: sinDesc.length };
+}
+
 // ───────────────── Stats ─────────────────
 
 async function stats() {
@@ -940,6 +1236,8 @@ module.exports = {
   countDescartadas,
   PAGE_SIZE_DEFAULT,
   stats,
+  dashboard,
+  reEnriquecerSinDescripcion,
   registrarBusqueda,
   listarLogs,
   obtenerLog,

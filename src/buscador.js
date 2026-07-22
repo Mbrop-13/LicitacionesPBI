@@ -114,16 +114,20 @@ async function ejecutarBusqueda(opts = {}) {
 
       let res = evaluar(lic, perfil);
 
-      // Solo pedir detalle si hay indicios (más rápido y menos 429)
+      // Detectar nombres técnicos en el nombre (indicio para pedir detalle)
       const nombresTecnicos =
         /capaci|formaci|curso|taller|entren|excel|power\s*bi|powerbi|\bsql\b|sql\s*server|tsql|transact|python|machine|deep\s*learning|\bia\b|inteligencia\s*artificial|business\s*intelligence|inteligencia\s*de\s*negocios|big\s*data|power\s*automate|power\s*apps|power\s*platform|data\s*warehouse|data\s*lake|analisis\s*de\s*datos|analitica\s*de\s*datos|e-?learning|certificacion|\bdax\b|\brpa\b|\bkpi\b|\bllm\b|chatgpt|copilot/i.test(
           lic.nombre || ''
         );
+      // En local: enriquece cualquier lic que no tenga descripción (muchas veces
+      // la palabra clave está en la descripción, no en el nombre). En Vercel
+      // (serverless con techo de 60s) se mantiene selectivo para evitar 504.
+      const enriquecerEnLocal = !esVercel;
       const necesitaDetalle =
         config.enriquecerDetalle &&
         detallesPedidos < maxDetalles &&
-        (!lic.descripcion || res.soloFormacion) &&
-        (res.pasa || res.soloFormacion || nombresTecnicos);
+        !lic.descripcion &&
+        (enriquecerEnLocal || res.pasa || res.soloFormacion || nombresTecnicos);
 
       if (necesitaDetalle) {
         if (control.isCancelled()) {
