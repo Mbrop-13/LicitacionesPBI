@@ -315,7 +315,7 @@ function renderDashboard(d) {
   const v = d.ventanas || {};
   const ultLog = d.ultimoLog;
   const ultLogTxt = ultLog
-    ? `${formatearFechaCorta(ultLog.fecha)} · API ${ultLog.licitaciones_api ?? 0} · ${ultLog.licitaciones_nuevas ?? 0} nuevas`
+    ? `${formatearFecha(ultLog.fecha)} · API ${ultLog.licitaciones_api ?? 0} · ${ultLog.licitaciones_nuevas ?? 0} nuevas`
     : 'Sin escaneos aún';
 
   host.innerHTML = `
@@ -475,7 +475,6 @@ function ventanaCard(label, v) {
         <div><b>${v.encontradas || 0}</b><span>encontradas</span></div>
         <div><b class="hi">${v.nuevas || 0}</b><span>nuevas</span></div>
         <div><b class="warn">${v.descartadas || 0}</b><span>descartadas</span></div>
-        <div><b class="muted">${v.api || 0}</b><span>en API</span></div>
       </div>
     </article>`;
 }

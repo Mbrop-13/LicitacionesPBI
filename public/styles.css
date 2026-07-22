@@ -634,7 +634,7 @@ button { cursor: pointer; border: none; background: none; }
 }
 .dash-ventana-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 0.6rem;
 }
 .dash-ventana-grid > div {
