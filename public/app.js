@@ -121,6 +121,38 @@ function wire() {
       msg.textContent = e.error || e.message || 'Error';
     }
   });
+  document.getElementById('cfg-btn-test-email')?.addEventListener('click', async () => {
+    const msg = document.getElementById('cfg-ping-msg');
+    msg.style.color = 'var(--text)';
+    msg.textContent = 'Enviando correo de prueba vía Amazon SES...';
+    try {
+      const res = await api('/api/test-email', { method: 'POST' });
+      msg.style.color = 'var(--ok)';
+      msg.textContent = res.mensaje || '¡Correo enviado con éxito!';
+      toast('Correo de prueba enviado');
+    } catch (e) {
+      msg.style.color = 'var(--danger)';
+      msg.textContent = e.error || e.message || 'Error al enviar correo';
+      toast(e.error || e.message || 'Error email', true);
+    }
+  });
+  document.getElementById('cfg-btn-test-cron')?.addEventListener('click', async () => {
+    const msg = document.getElementById('cfg-ping-msg');
+    msg.style.color = 'var(--text)';
+    msg.textContent = 'Ejecutando Cron (simulando 11:00 AM)...';
+    try {
+      const res = await api('/api/cron');
+      msg.style.color = 'var(--ok)';
+      msg.textContent = 'Búsqueda de Cron finalizada correctamente';
+      toast('Cron ejecutado');
+      cargarStats();
+      if (view !== 'inicio') cargarVista();
+    } catch (e) {
+      msg.style.color = 'var(--danger)';
+      msg.textContent = e.error || e.message || 'Error Cron';
+      toast(e.error || e.message || 'Error Cron', true);
+    }
+  });
 
   document.getElementById('btn-page-prev').addEventListener('click', () => {
     if (page > 1) {
@@ -1704,6 +1736,7 @@ async function openConfig() {
     const s = await api('/api/status');
     setPill('cfg-st-ticket', s.ticketConfigurado, s.ticketConfigurado ? 'OK' : 'Falta ticket');
     setPill('cfg-st-storage', true, s.storage === 'supabase' ? 'Supabase' : 'Local');
+    setPill('cfg-st-email', s.emailConfigurado, s.emailConfigurado ? 'Activo' : 'Falta SMTP');
     setPill('cfg-st-webhook', s.notifyWebhook, s.notifyWebhook ? 'Activo' : 'No');
   } catch {
     /* ok */

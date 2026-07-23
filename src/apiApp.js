@@ -3,11 +3,12 @@
 // App Express compartida entre el servidor local (src/server.js)
 // y la función serverless de Vercel (api/[...slug].js).
 const express = require('express');
-const { config, ticketOk, supabaseOk } = require('./config');
+const { config, ticketOk, supabaseOk, emailOk } = require('./config');
 const { KEYWORDS_DEFAULT } = require('./matcher/keywords');
 const store = require('./store/db');
 const { reevaluarCodigo } = require('./buscador');
 const { pingApi } = require('./services/mercadoPublico');
+const { enviarEmailLicitaciones } = require('./services/email');
 const control = require('./busquedaControl');
 const job = require('./busquedaJob');
 const { importarCsv } = require('./services/csvImport');
@@ -24,6 +25,8 @@ app.get(`${BASE}/status`, (_req, res) => {
     app: 'ProgramBI Licitaciones',
     ticketConfigurado: ticketOk(),
     supabaseConfigurado: supabaseOk(),
+    emailConfigurado: emailOk(),
+    emailTo: config.emailTo || config.notifyEmail || null,
     storage: store.modoStorage(),
     notifyWebhook: !!config.notifyWebhook,
     notifyEmail: config.notifyEmail || null,
@@ -311,6 +314,30 @@ app.get(`${BASE}/cron`, async (req, res) => {
     res.json({ ok: true, started: true, ...started });
   } catch (e) {
     res.status(409).json({ error: e.message });
+  }
+});
+
+app.post(`${BASE}/test-email`, async (_req, res) => {
+  try {
+    const licitacionPrueba = {
+      codigoExterno: 'TEST-' + Math.floor(Math.random() * 89999 + 10000) + '-LP26',
+      nombre: 'Prueba de Correo ProgramBI: Capacitación Power BI y Excel',
+      nombreOrganismo: 'Ministerio de Ejemplo - Gobierno de Chile',
+      cursos: [
+        { id: 'excel', nombre: 'Excel Avanzado' },
+        { id: 'powerbi', nombre: 'Power BI' },
+      ],
+      afinidad: 98,
+      urlFicha: 'https://www.mercadopublico.cl',
+    };
+    const r = await enviarEmailLicitaciones([licitacionPrueba], { origen: 'test' });
+    if (r.enviada) {
+      res.json({ ok: true, mensaje: `Correo de prueba enviado a ${r.destino}`, ...r });
+    } else {
+      res.status(400).json({ error: r.razon || 'Error al enviar correo' });
+    }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
 });
 

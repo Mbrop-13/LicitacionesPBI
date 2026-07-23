@@ -252,10 +252,13 @@
           <div class="status-row" style="margin-top:0.65rem">
             <div class="status-item">API <span class="pill" id="cfg-st-ticket"><span class="dot"></span>…</span></div>
             <div class="status-item">Storage <span class="pill" id="cfg-st-storage"><span class="dot"></span>…</span></div>
+            <div class="status-item">Email SES <span class="pill" id="cfg-st-email"><span class="dot"></span>…</span></div>
             <div class="status-item">Webhook <span class="pill" id="cfg-st-webhook"><span class="dot"></span>…</span></div>
           </div>
-          <div class="actions-row">
+          <div class="actions-row" style="margin-top:0.75rem; flex-wrap:wrap; gap:0.4rem;">
             <button type="button" class="btn btn-secondary btn-sm" id="cfg-btn-ping">Probar API</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="cfg-btn-test-email">📧 Probar Email SES</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="cfg-btn-test-cron">⏰ Ejecutar Cron (11 AM)</button>
             <span class="save-msg" id="cfg-ping-msg" style="margin:0"></span>
           </div>
         </section>

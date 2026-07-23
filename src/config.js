@@ -58,4 +58,8 @@ function supabaseOk() {
   );
 }
 
-module.exports = { config, ticketOk, supabaseOk };
+function emailOk() {
+  return !!(config.smtpHost && config.smtpUser && config.smtpPass && (config.emailTo || config.notifyEmail));
+}
+
+module.exports = { config, ticketOk, supabaseOk, emailOk };
