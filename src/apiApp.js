@@ -303,8 +303,9 @@ app.get(`${BASE}/buscar/estado`, (_req, res) => {
 });
 
 app.get(`${BASE}/cron`, async (req, res) => {
+  const isVercelCron = req.headers['x-vercel-cron'] === '1' || /vercel-cron/i.test(req.headers['user-agent'] || '');
   const auth = req.headers.authorization || '';
-  if (config.cronSecret && auth !== `Bearer ${config.cronSecret}`) {
+  if (!isVercelCron && config.cronSecret && auth !== `Bearer ${config.cronSecret}`) {
     if (req.query.secret !== config.cronSecret) {
       return res.status(401).json({ error: 'No autorizado' });
     }
